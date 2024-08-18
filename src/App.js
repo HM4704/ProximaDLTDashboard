@@ -1,13 +1,23 @@
 import React from 'react';
-import NodeDataTable from './components/NodeDataTable';
-import './App.css';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import Nodes from './pages/Nodes';
+import Sequencers from './pages/Sequencers';
+import Visualize from './pages/Visualizer';
+import NavTabs from './components/NavTabs';import './App.css';
 
 function App() {
 
   return (
+
     <div className="App">
-      <h1>Proxima dashboard</h1>
-      <NodeDataTable/>
+    <Router>
+      <NavTabs />
+      <Routes>
+        <Route path="/nodes" element={<Nodes />} />
+        <Route path="/sequencers" element={<Sequencers />} />
+        <Route path="/visualize" element={<Visualize />} />
+      </Routes>
+    </Router>      
     </div>
   );
 }

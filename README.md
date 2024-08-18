@@ -1,4 +1,4 @@
-# Proxima Net Dashboard
+# Proxima DLT Dashboard
 
-This is a dashboard for the Proxima project.
+This is a dashboard for the Proxima DLT project.
 
