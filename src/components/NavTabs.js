@@ -1,18 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, Tab } from '@mui/material';
-import { Link, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function NavTabs() {
-  const location = useLocation();
-  const currentPath = location.pathname;
+    const [value, setValue] = useState(0);
+    const navigate = useNavigate();
+    const location = useLocation();
 
-  return (
-    <Tabs value={currentPath}>
-      <Tab label="Nodes" value="/nodes" component={Link} to="/nodes" />
-      <Tab label="Sequencers" value="/sequencers" component={Link} to="/sequencers" />
-      <Tab label="Visualizer" value="/visualizer" component={Link} to="/visualizer" />
-    </Tabs>
-  );
+    // Sync the tab value with the current route
+    React.useEffect(() => {
+        if (location.pathname === '/') setValue(0);
+        else if (location.pathname === '/sequencers') setValue(1);
+        else if (location.pathname === '/visualizer') setValue(2);
+    }, [location.pathname]);
+
+    const handleChange = (event, newValue) => {
+        setValue(newValue);
+        if (newValue === 0) navigate('/');
+        else if (newValue === 1) navigate('/sequencers');
+        else if (newValue === 2) navigate('/visualizer');
+    };
+
+    return (
+        <Tabs value={value} onChange={handleChange} centered>
+            <Tab label="Nodes" />
+            <Tab label="Sequencers" />
+            <Tab label="Visualizer" />
+        </Tabs>
+    );
 }
 
 export default NavTabs;
