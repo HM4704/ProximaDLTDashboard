@@ -82,7 +82,7 @@ function NodeDataTable() {
             .then((data) => {
                 const newData = {
                     ip,
-                    id: data.id,
+                    id: '...' + data.id.substring(20, data.id.length),
                     numPeers: (data.num_static_peers + data.num_dynamic_alive).toString(),
                     synced: true,
                     version: data.version,
