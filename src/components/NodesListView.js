@@ -1,6 +1,6 @@
 import React from 'react';
-import Header from './Header';
-import ListItem from './ListItem';
+import Header from './NodesHeader';
+import ListItem from './NodesListItem';
 
 const ListView = ({ data }) => {
   return (

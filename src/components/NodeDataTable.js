@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ListView from './ListView';
+import ListView from './NodesListView';
 
 function addUniqueString(array, stringToAdd) {
     if (stringToAdd.length === 0) {
