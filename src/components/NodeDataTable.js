@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ListView from './NodesListView';
+import config from './../config';  // Import the configuration
 
 function addUniqueString(array, stringToAdd) {
     if (stringToAdd.length === 0) {
@@ -57,10 +58,10 @@ function NodeDataTable() {
     const unkownVal = '???';
 
     useEffect(() => {
-        let nodeList = ['192.168.178.32'];
+        let nodeList = [config.baseUrl];
 
         const intervalId = setInterval(() => {
-            getNodeList('192.168.178.32', nodeList).then(updatedList => {
+            getNodeList(config.baseUrl, nodeList).then(updatedList => {
                 updatedList.forEach((ip) => {
                     fetchNodeInfo(ip);
                     fetchSyncInfo(ip);

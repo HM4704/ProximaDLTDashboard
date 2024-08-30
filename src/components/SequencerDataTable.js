@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import ListView from './SequencersListView';
+import config from './../config';  // Import the configuration
 
 function SequencerDataTable() {
     const [sequencerData, setSequencerData] = useState([]);
     const unkownVal = '???';
-    let ip = '192.168.178.32';
+    const ip = config.baseUrl;  // Use the IP from the config
 
     useEffect(() => {
 
