@@ -25,14 +25,20 @@ Deploys the current package to https://hm4704.github.io/ProximaDLTDashboard.
 
 Installs the package on the branch gh-pages to be served on https://your-username.github.io. The following settings have to be made in package.json:
 
-- add the variable "homepage": "https://your-username.github.io/your-repo-name"  with the link to your site on https://your-username.github.io/
+- add the following variable 
+``` 
+"homepage": "https://your-username.github.io/your-repo-name"  
+``` 
+with the link to your site on https://your-username.github.io/
+
 
 - Add the following scripts under the "scripts" section:
+``` 
 "scripts": {
   "predeploy": "npm run build",
   "deploy": "gh-pages -d build"
 }
-
+``` 
 
 ### npm test
 
