@@ -1,6 +1,6 @@
 // src/config.js
-const config = {
-    baseUrl: '93.228.65.91',
+var config = {
+    baseUrl: '83.229.84.197:8000',
 };
 
 export default config;

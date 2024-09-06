@@ -5,19 +5,19 @@ import config from './../config';  // Import the configuration
 function SequencerDataTable() {
     const [sequencerData, setSequencerData] = useState([]);
     const unkownVal = '???';
-    const ip = config.baseUrl;  // Use the IP from the config
+    //const ip = config.baseUrl;  // Use the IP from the config
 
     useEffect(() => {
 
         const intervalId = setInterval(() => {
-            fetchSequencerStats(ip);
+            fetchSequencerStats(config.baseUrl);
         }, 5000);
 
         return () => clearInterval(intervalId);
     }, []);
 
     const fetchSequencerStats = (ip) => {
-        fetch(`http://${ip}:8000/sequencer_stats`)
+        fetch(`http://${ip}/sequencer_stats`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);

@@ -30,7 +30,7 @@ function getIp(address) {
 
 async function getNodeList(ip, nodeList) {
     try {
-        const response = await fetch(`http://${ip}:8000/peers_info`);
+        const response = await fetch(`http://${ip}/peers_info`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -58,9 +58,9 @@ function NodeDataTable() {
     const unkownVal = '???';
 
     useEffect(() => {
-        let nodeList = [config.baseUrl];
 
         const intervalId = setInterval(() => {
+            let nodeList = [config.baseUrl];
             getNodeList(config.baseUrl, nodeList).then(updatedList => {
                 updatedList.forEach((ip) => {
                     fetchNodeInfo(ip);
@@ -103,7 +103,7 @@ function NodeDataTable() {
     };
 
     const fetchSyncInfo = (ip) => {
-        fetch(`http://${ip}:8000/sync_info`)
+        fetch(`http://${ip}/sync_info`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
