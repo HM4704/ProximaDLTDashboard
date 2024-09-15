@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ListView from './NodesListView';
 import config from './../config';  // Import the configuration
 
-function addUniqueString(array, stringToAdd) {
-    if (stringToAdd.length === 0) {
+function registerAddress(array, stringToAdd) {
+    if (stringToAdd.length === 0 || stringToAdd.includes('127.0.0.1')) {
         return array;
     }
 
@@ -13,18 +13,18 @@ function addUniqueString(array, stringToAdd) {
     return array;
 }
 
-function getIp(address) {
-    // Regular expression to match the IP address
-    const ipPattern = /\/ip4\/([\d.]+)/;
-
-    // Extract the IP address
-    const match = address.match(ipPattern);
-    if (match) {
-        const ipAddress = match[1];
-        return ipAddress;
+function extractIPAndPort(input) {
+    // Regular expression to capture the IP address and port
+    const regex = /\/ip4\/([0-9.]+)\/tcp\/400([0-9])/;
+    const matches = input.match(regex);
+  
+    // Check if the regex found a match
+    if (matches) {
+      const ip = matches[1];
+      const port = matches[2];
+      return `${ip}:800${port}`;  // Returning as "ip:port"
     } else {
-        console.log("No IP address found");
-        return '';
+      throw new Error("Invalid format");
     }
 }
 
@@ -41,7 +41,7 @@ async function getNodeList(ip, nodeList) {
         // Update the nodeData state with the new data
         data.peers.forEach(peer => {
             peer.multiAddresses.forEach(address => {
-                addUniqueString(nodeList, getIp(address));
+                registerAddress(nodeList, extractIPAndPort(address));
                 console.log(`  - ${address}`);
             });
         });
@@ -73,7 +73,7 @@ function NodeDataTable() {
     }, []); // Empty dependency array means this effect runs only once on mount
 
     const fetchNodeInfo = (ip) => {
-        fetch(`http://${ip}:8000/node_info`)
+        fetch(`http://${ip}/node_info`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
