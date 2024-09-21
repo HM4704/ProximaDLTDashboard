@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/ProximaDLTDashboard/static/css/main.22001a12.css",
-    "main.js": "/ProximaDLTDashboard/static/js/main.9e822eca.js",
+    "main.js": "/ProximaDLTDashboard/static/js/main.47c8b2d0.js",
     "static/js/453.4a36aee4.chunk.js": "/ProximaDLTDashboard/static/js/453.4a36aee4.chunk.js",
     "index.html": "/ProximaDLTDashboard/index.html",
     "main.22001a12.css.map": "/ProximaDLTDashboard/static/css/main.22001a12.css.map",
-    "main.9e822eca.js.map": "/ProximaDLTDashboard/static/js/main.9e822eca.js.map",
+    "main.47c8b2d0.js.map": "/ProximaDLTDashboard/static/js/main.47c8b2d0.js.map",
     "453.4a36aee4.chunk.js.map": "/ProximaDLTDashboard/static/js/453.4a36aee4.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.22001a12.css",
-    "static/js/main.9e822eca.js"
+    "static/js/main.47c8b2d0.js"
   ]
 }
