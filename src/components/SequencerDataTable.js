@@ -17,7 +17,7 @@ function SequencerDataTable() {
     }, []);
 
     const fetchSequencerStats = (ip) => {
-        fetch(`http://${ip}/sequencer_stats`)
+        fetch(`http://${ip}/sequencer_stats?slots=100`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
