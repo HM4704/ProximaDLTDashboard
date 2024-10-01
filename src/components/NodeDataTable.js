@@ -17,12 +17,21 @@ function extractIPAndPort(input) {
     // Regular expression to capture the IP address and port
     const regex = /\/ip4\/([0-9.]+)\/tcp\/400([0-9])/;
     const matches = input.match(regex);
+    // /ip4/113.30.191.219/udp/4001/quic-v1
+    const regexQuic = /\/ip4\/([0-9.]+)\/udp\/400([0-9])\/quic-v1/;
+    const matchesQuic = input.match(regexQuic);
   
     // Check if the regex found a match
-    if (matches) {
-      const ip = matches[1];
-      const port = matches[2];
-      return `${ip}:800${port}`;  // Returning as "ip:port"
+    if (matches || matchesQuic) {
+        if (matches) {
+            const ip = matches[1];
+            const port = matches[2];
+            return `${ip}:800${port}`;  // Returning as "ip:port"
+        } else {
+            const ip = matchesQuic[1];
+            const port = matchesQuic[2];
+            return `${ip}:800${port}`;  // Returning as "ip:port"
+        }
     } else {
       throw new Error("Invalid format");
     }
