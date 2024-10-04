@@ -6,7 +6,7 @@ const ListItem = ({ ip, id, numPeers, synced, sequId, slotHC, version }) => {
       <td>{ip}</td>
       <td>{id}</td>
       <td>{numPeers}</td>
-      <td>{synced ? 'Yes' : 'No'}</td>
+      <td>{synced}</td>
       <td>{sequId}</td>
       <td>{slotHC}</td>
       <td>{version}</td>

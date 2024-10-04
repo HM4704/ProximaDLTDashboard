@@ -94,7 +94,7 @@ function NodeDataTable() {
                     ip,
                     id: '...' + data.id.substring(20, data.id.length),
                     numPeers: (data.num_static_peers + data.num_dynamic_alive).toString(),
-                    synced: true,
+                    //synced: true,
                     version: data.version,
                 };
                 updateNodeData(newData);
@@ -105,7 +105,7 @@ function NodeDataTable() {
                     ip,
                     id: unkownVal,
                     numPeers: unkownVal,
-                    synced: false,
+                    synced: unkownVal,
                     version: unkownVal,
                 });
             });
@@ -122,7 +122,7 @@ function NodeDataTable() {
             .then((data) => {
                 const updatedData = {
                     ip,
-                    synced: data.synced,
+                    synced: data.synced ? "Yes" : "No",
                     slotHC: unkownVal,
                 };
     
@@ -150,7 +150,7 @@ function NodeDataTable() {
                 console.error('Fetch error:', error);
                 updateNodeData({
                     ip,
-                    synced: false,
+                    synced: unkownVal,
                     slotHC: unkownVal,
                     sequId: unkownVal,
                 });
@@ -173,7 +173,7 @@ function NodeDataTable() {
 
     return (
         <div className="NodeDataTable">
-            <ListView data={nodeData} />
+            <ListView data={nodeData} />            
         </div>
     );
 }
