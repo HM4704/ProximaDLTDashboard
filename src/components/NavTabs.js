@@ -12,6 +12,7 @@ function NavTabs() {
         if (location.pathname === '/') setValue(0);
         else if (location.pathname === '/sequencers') setValue(1);
         else if (location.pathname === '/visualizer') setValue(2);
+        else if (location.pathname === '/peers') setValue(3);
     }, [location.pathname]);
 
     const handleChange = (event, newValue) => {
@@ -19,11 +20,13 @@ function NavTabs() {
         if (newValue === 0) navigate('/');
         else if (newValue === 1) navigate('/sequencers');
         else if (newValue === 2) navigate('/visualizer');
+        else if (newValue === 3) navigate('/peers');
     };
 
     return (
         <Tabs value={value} onChange={handleChange} centered>
             <Tab label="Nodes" />
+            <Tab label="Peers" />
             <Tab label="Sequencers" />
             <Tab label="Visualizer" />
         </Tabs>

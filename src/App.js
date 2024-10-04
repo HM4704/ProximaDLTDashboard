@@ -3,6 +3,7 @@ import { HashRouter as Router, Route, Routes } from 'react-router-dom';
 import Nodes from './pages/Nodes';
 import Sequencers from './pages/Sequencers';
 import Visualizer from './pages/Visualizer';
+import Peers from './pages/Peers';
 import NavTabs from './components/NavTabs';import './App.css';
 import config from './config';  // Import the configuration
 
@@ -33,6 +34,7 @@ function App() {
                     <NavTabs />
                     <Routes>
                         <Route path="/" element={<Nodes />} />
+                        <Route path="/peers" element={<Peers />} />
                         <Route path="/sequencers" element={<Sequencers />} />
                         <Route path="/visualizer" element={<Visualizer />} />
                     </Routes>
