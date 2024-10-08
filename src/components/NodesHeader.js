@@ -10,7 +10,7 @@ const Header = () => {
         <th># Peers</th>
         <th>Synced</th>
         <th>Sequencer ID</th>
-        <th>Slot(healthy/cmttd)</th>
+        <th>Slot(lrb / current)</th>
         <th>Version</th>
       </tr>
     </thead>

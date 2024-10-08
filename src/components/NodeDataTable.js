@@ -123,25 +123,29 @@ function NodeDataTable() {
                 const updatedData = {
                     ip,
                     synced: data.synced ? "Yes" : "No",
+                    sequId: unkownVal,
                     slotHC: unkownVal,
                 };
-    
+                
                 if (data.per_sequencer) {
                     // Check if per_sequencer is an array
                     if (Array.isArray(data.per_sequencer)) {
                         data.per_sequencer.forEach((value, key) => {
                             updatedData.sequId = key;
-                            updatedData.slotHC = `${value.latest_healthy_slot.string()}/${value.latest_committed_slot.string()}`;
+                            updatedData.slotHC = `${value.latest_healthy_slot.toString()} / ${value.latest_committed_slot.toString()}`;
                         });
                     } else if (typeof data.per_sequencer === 'object') {
                         // If it's an object, loop through its keys
                         for (const [key, value] of Object.entries(data.per_sequencer)) {
                             updatedData.sequId = key;
-                            updatedData.slotHC = `${value.latest_healthy_slot.toString()}/${value.latest_committed_slot.toString()}`;
+                            updatedData.slotHC = `${value.latest_healthy_slot.toString()} / ${value.latest_committed_slot.toString()}`;
                         }
                     } else {
                         console.error('Unexpected structure for per_sequencer:', data.per_sequencer);
                     }
+                }
+                if (data.lrb_slot && data.current_slot) {
+                    updatedData.slotHC = `${data.lrb_slot.toString()} / ${data.current_slot.toString()}`;
                 }
     
                 updateNodeData(updatedData);
