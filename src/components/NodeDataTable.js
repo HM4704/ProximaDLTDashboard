@@ -39,7 +39,7 @@ function extractIPAndPort(input) {
 
 async function getNodeList(ip, nodeList) {
     try {
-        const response = await fetch(`http://${ip}/peers_info`);
+        const response = await fetch(`http://${ip}/api/v1/peers_info`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -82,7 +82,7 @@ function NodeDataTable() {
     }, []); // Empty dependency array means this effect runs only once on mount
 
     const fetchNodeInfo = (ip) => {
-        fetch(`http://${ip}/node_info`)
+        fetch(`http://${ip}/api/v1/node_info`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -112,7 +112,7 @@ function NodeDataTable() {
     };
 
     const fetchSyncInfo = (ip) => {
-        fetch(`http://${ip}/sync_info`)
+        fetch(`http://${ip}/api/v1/sync_info`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
