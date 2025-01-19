@@ -29,14 +29,13 @@ function SequencerDataTable() {
                 for (const [chainId, chainInfo] of Object.entries(chainsData.chains)) {
                     const existingIndex = updatedSequencerData.findIndex((item) => item.chainId === chainId);
     
+                    // Update or add basic chain info
                     if (existingIndex !== -1) {
-                        // Update existing chain data
                         updatedSequencerData[existingIndex] = {
                             ...updatedSequencerData[existingIndex],
                             data: chainInfo.data,
                         };
                     } else {
-                        // Add new chain data
                         updatedSequencerData.push({
                             chainId,
                             data: chainInfo.data,
@@ -46,33 +45,42 @@ function SequencerDataTable() {
                 return updatedSequencerData;
             });
     
-            // Update parsed data for all chains
+            // Fetch and filter parsed data
             const updatedDataPromises = Object.entries(chainsData.chains).map(async ([chainId, chainInfo]) => {
                 const parseResponse = await fetch(parseOutputDataUrl + encodeURIComponent(chainInfo.data));
                 if (!parseResponse.ok) throw new Error(`Failed to parse data for chain: ${chainId}`);
                 const parsedData = await parseResponse.json();
     
-                return {
-                    chainId,
-                    name: "",
-                    onChainBalance: parsedData.amount,
-                    id: parsedData.chain_id,
-                };
+                // Only include data if constraints contain "sequencer"
+                if (parsedData.constraints.some((constraint) => constraint.includes("sequencer"))) {
+                    return {
+                        chainId,
+                        name: "",
+                        onChainBalance: parsedData.amount,
+                        id: parsedData.chain_id,
+                    };
+                }
+                return null; // Skip chains without "sequencer" constraint
             });
     
-            const parsedResults = await Promise.all(updatedDataPromises);
+            const parsedResults = (await Promise.all(updatedDataPromises)).filter(Boolean); // Remove nulls
     
+            // Update state with filtered results
             setSequencerData((prevSequencerData) =>
                 prevSequencerData.map((chainData) => {
                     const parsed = parsedResults.find((parsed) => parsed.chainId === chainData.chainId);
                     return parsed ? { ...chainData, ...parsed } : chainData;
-                })
+                }).concat(
+                    parsedResults.filter(
+                        (parsed) => !prevSequencerData.some((chainData) => chainData.chainId === parsed.chainId)
+                    )
+                )
             );
         } catch (error) {
             console.error('Error fetching sequencer stats:', error.message);
         }
     };
-    
+        
     return (
         <div className="NodeDataTable">
             <ListView data={sequencerData} />
