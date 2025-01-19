@@ -2,13 +2,11 @@ import React, { useState, useEffect } from 'react';
 import ListView from './SequencersListView';
 import config from './../config';  // Import the configuration
 
+
 function SequencerDataTable() {
     const [sequencerData, setSequencerData] = useState([]);
-    const unkownVal = '???';
-    //const ip = config.baseUrl;  // Use the IP from the config
 
     useEffect(() => {
-
         const intervalId = setInterval(() => {
             fetchSequencerStats(config.baseUrl);
         }, 5000);
@@ -16,53 +14,72 @@ function SequencerDataTable() {
         return () => clearInterval(intervalId);
     }, []);
 
-    const fetchSequencerStats = (ip) => {
-        fetch(`http://${ip}/sequencer_stats?slots=100`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then((data) => {
-                let updatedEntries = [];  // Array to hold all updated entries
-
-                if (data.sequ_stat) {
-                    for (const [key, value] of Object.entries(data.sequ_stat)) {
-                        updatedEntries.push({
-                            id: key,
-                            name: value.name,
-                            wins: value.wins,
-                            onChainBalance: value.on_chain_balance,
+    const fetchSequencerStats = async (baseUrl) => {
+        const allChainsUrl = `http://${baseUrl}/api/v1/get_all_chains`;
+        const parseOutputDataUrl = `http://${baseUrl}/txapi/v1/parse_output_data?output_data=`;
+    
+        try {
+            const chainsResponse = await fetch(allChainsUrl);
+            if (!chainsResponse.ok) throw new Error('Failed to fetch chains data');
+            const chainsData = await chainsResponse.json();
+    
+            setSequencerData((prevSequencerData) => {
+                const updatedSequencerData = [...prevSequencerData];
+    
+                for (const [chainId, chainInfo] of Object.entries(chainsData.chains)) {
+                    const existingIndex = updatedSequencerData.findIndex((item) => item.chainId === chainId);
+    
+                    if (existingIndex !== -1) {
+                        // Update existing chain data
+                        updatedSequencerData[existingIndex] = {
+                            ...updatedSequencerData[existingIndex],
+                            data: chainInfo.data,
+                        };
+                    } else {
+                        // Add new chain data
+                        updatedSequencerData.push({
+                            chainId,
+                            data: chainInfo.data,
                         });
                     }
-
-                    // Update the sequencerData state with all updated entries
-                    setSequencerData(prevData => {
-                        const newData = [...prevData];
-                        updatedEntries.forEach(newEntry => {
-                            const index = newData.findIndex(node => node.id === newEntry.id);
-                            if (index !== -1) {
-                                newData[index] = { ...newData[index], ...newEntry };
-                            } else {
-                                newData.push(newEntry);
-                            }
-                        });
-                        return newData;
-                    });
                 }
-
-            })
-            .catch((error) => {
-                console.error('Fetch error:', error);
+                return updatedSequencerData;
             });
+    
+            // Update parsed data for all chains
+            const updatedDataPromises = Object.entries(chainsData.chains).map(async ([chainId, chainInfo]) => {
+                const parseResponse = await fetch(parseOutputDataUrl + encodeURIComponent(chainInfo.data));
+                if (!parseResponse.ok) throw new Error(`Failed to parse data for chain: ${chainId}`);
+                const parsedData = await parseResponse.json();
+    
+                return {
+                    chainId,
+                    name: "",
+                    onChainBalance: parsedData.amount,
+                    id: parsedData.chain_id,
+                };
+            });
+    
+            const parsedResults = await Promise.all(updatedDataPromises);
+    
+            setSequencerData((prevSequencerData) =>
+                prevSequencerData.map((chainData) => {
+                    const parsed = parsedResults.find((parsed) => parsed.chainId === chainData.chainId);
+                    return parsed ? { ...chainData, ...parsed } : chainData;
+                })
+            );
+        } catch (error) {
+            console.error('Error fetching sequencer stats:', error.message);
+        }
     };
-
+    
     return (
         <div className="NodeDataTable">
             <ListView data={sequencerData} />
         </div>
     );
 }
+
+
 
 export default SequencerDataTable;

@@ -1,12 +1,10 @@
 import React from 'react';
 
-const ListItem = ({ id, name, wins, onChainBalance }) => {
+const ListItem = ({ id, name, onChainBalance }) => {
   return (
     <tr>
       <td>{name}</td>
       <td>{id}</td>
-      <td>{wins}</td>
-      {/* <td>{wins}</td> */}
       <td>{onChainBalance}</td>
     </tr>
   );

@@ -8,7 +8,7 @@ const ListView = ({ data }) => {
       <Header />
       <tbody>
         {data.map((item, index) => (
-          <ListItem key={index} name={item.name} id={item.id} wins={item.wins} onChainBalance={item.onChainBalance}  />
+          <ListItem key={index} name={item.name} id={item.id} onChainBalance={item.onChainBalance}  />
         ))}
       </tbody>
     </table>
