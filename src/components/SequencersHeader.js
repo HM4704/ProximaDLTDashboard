@@ -6,7 +6,8 @@ const Header = () => {
       <tr>
       <th>Name</th>
       <th>ID</th>
-        <th>On Chain Balance</th>
+      <th>On Chain Balance</th>
+      <th>Inflation</th>
       </tr>
     </thead>
   );

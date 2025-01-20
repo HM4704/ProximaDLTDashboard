@@ -3,6 +3,41 @@ import ListView from './SequencersListView';
 import config from './../config';  // Import the configuration
 
 
+function extractOrConstraint(constraints) {
+    const orConstraint = constraints.find(item => item.startsWith("or("));
+    
+    if (orConstraint) {
+        // Extract the hex string (first value inside parentheses)
+        const match = orConstraint.match(/0x[0-9a-fA-F]+/);
+        
+        if (match) {
+            // Convert hex string to ASCII characters
+            const hexString = match[0].slice(2);
+            let asciiString = '';
+            for (let i = 0; i < hexString.length; i += 2) {
+                asciiString += String.fromCharCode(parseInt(hexString.substr(i, 2), 16));
+            }
+            return asciiString;
+        }
+    }
+    
+    return "";
+}
+
+function extractInflationValue(constraints) {
+    const inflationConstraint = constraints.find(item => item.startsWith("inflation("));
+
+    if (inflationConstraint) {
+        // Extract the number inside the parentheses after "u64/"
+        const match = inflationConstraint.match(/u64\/(\d+)/);
+        if (match) {
+            return match[1]; // Return the extracted number as a string
+        }
+    }
+    
+    return "";
+}
+
 function SequencerDataTable() {
     const [sequencerData, setSequencerData] = useState([]);
 
@@ -55,9 +90,10 @@ function SequencerDataTable() {
                 if (parsedData.constraints.some((constraint) => constraint.includes("sequencer"))) {
                     return {
                         chainId,
-                        name: "",
+                        name: extractOrConstraint(parsedData.constraints),
                         onChainBalance: parsedData.amount,
                         id: parsedData.chain_id,
+                        inflation: extractInflationValue(parsedData.constraints),
                     };
                 }
                 return null; // Skip chains without "sequencer" constraint
@@ -87,7 +123,6 @@ function SequencerDataTable() {
         </div>
     );
 }
-
 
 
 export default SequencerDataTable;
