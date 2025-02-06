@@ -50,7 +50,7 @@ const DAGVisualizer = () => {
   const [graphData, setGraphData] = useState([]);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8080/ws");
+    const ws = new WebSocket("ws://192.168.178.35:8080/ws");
 
     ws.onmessage = (event) => {
       const newData = JSON.parse(event.data);
