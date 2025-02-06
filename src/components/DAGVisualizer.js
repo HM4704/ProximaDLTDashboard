@@ -23,7 +23,7 @@ const DAGVisualizer = () => {
       // const size = node.data?.initial ? 15 : 15; // Start small, then grow
 
       if (node.data && node.data.type === "sequencer") {
-        return Viva.Graph.View.webglSquare(12, SeqTxCol); // Orange Circle for Sequencer
+        return Viva.Graph.View.webglSquare(11, SeqTxCol); // Orange square for Sequencer
       }
       return Viva.Graph.View.webglSquare(10, NormalTxCol); // Initial small size, gold color ADD8E6
     });
@@ -31,22 +31,28 @@ const DAGVisualizer = () => {
     // Custom link appearance: Normal vs. Endorsement (dashed)
     graphics.link((link) => {
       if (link.data && link.data.type === "endorse") {
-        return Viva.Graph.View.webglLine(EndorseLinkCol, 2, true); // Dashed orange for endorsements
+        return Viva.Graph.View.webglLine(EndorseLinkCol, 1, true); // orange for endorsements
       }
-      return Viva.Graph.View.webglLine(NormalLinkCol, 2); // Normal links
+      return Viva.Graph.View.webglLine(NormalLinkCol, 4); // Normal links
     });
 
-    layout.current = Viva.Graph.Layout.forceDirected(graph.current, {
-      //springLength: 10,  // Nodes are pulled closer
-      // springCoeff: 0.0008, // Adjusts how strong the springs pull
-      dragCoeff: 0.02, // Higher values reduce "jittering"
-      //gravity: -10,  // Low gravity prevents excessive spreading
-      theta: 0.8, // Lower theta makes the force calculations more precise
+    // springLength
+    //   50 for endorsement links → Makes them longer
+    //   30 for regular input links → Keeps them shorter
+    // springCoeff (spring stiffness)
+    //   0.0002 for endorsement links → Makes them looser/stretchier
+    //   0.0008 for input links → Keeps them tighter
 
-      springLength: 30,  
-      gravity: -.5,  
-      springCoeff: 0.001
-     });
+     layout.current = Viva.Graph.Layout.forceDirected(graph.current, {
+      dragCoeff: 0.02,
+      gravity: -0.5,
+      theta: 0.8,     
+      
+      springTransform: function (link, spring) {
+        spring.length = (link.data?.type === "endorse" ? 55 : 35)
+        spring.coeff = (link.data?.type === "endorse" ?  0.0002 :  0.0008)
+      }      
+    });
 
     renderer.current = Viva.Graph.View.renderer(graph.current, {
       container: containerRef.current,
@@ -61,7 +67,9 @@ const DAGVisualizer = () => {
   useEffect(() => {
     if (!isInitialized) return;
     
-    const ws = new WebSocket("ws://localhost:8080/ws");
+    //const ws = new WebSocket("ws://localhost:8080/ws");
+    const ws = new WebSocket("ws://192.168.178.35:8080/ws");
+    
 
     ws.onmessage = (event) => {
       const newData = JSON.parse(event.data);
@@ -80,36 +88,29 @@ const DAGVisualizer = () => {
         }, 500);
       }
 
-      newData.in.forEach((source) => {
+    newData.in.forEach((source) => {
+      if (!graph.current.getNode(source)) {
+        graph.current.addNode(source, { initial: true });
+      }
+    
+      if (!graph.current.getLink(source, newData.id)) {
+        graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
+      }
+    });
+    
+    if (newData.endorse) {
+      newData.endorse.forEach((source) => {
         if (!graph.current.getNode(source)) {
-          graph.current.addNode(source, { initial: true, color: "#ADD8E6" });  // lightblue
-
-          setTimeout(() => {
-            graph.current.getNode(source).data.initial = false;
-          }, 500);
+          graph.current.addNode(source, { initial: true });
         }
-
+    
         if (!graph.current.getLink(source, newData.id)) {
-          graph.current.addLink(source, newData.id);
+          graph.current.addLink(source, newData.id, { type: "endorse" }); // Mark as endorsement
         }
       });
+    }
 
-      if (newData.endorse) {
-        newData.endorse.forEach((source) => {
-          if (!graph.current.getNode(source)) {
-            graph.current.addNode(source, { initial: true });  // lightblue
-
-            setTimeout(() => {
-              graph.current.getNode(source).data.initial = false;
-            }, 500);
-          }
-
-          if (!graph.current.getLink(source, newData.id)) {
-            graph.current.addLink(source, newData.id, { type: "endorse" });
-          }
-        });
-      }
-    };
+  };
 
     return () => ws.close();
   }, [isInitialized]);
@@ -138,7 +139,7 @@ const DAGVisualizer = () => {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <div style={{ width: "12px", height: "12px", backgroundColor: SeqTxCol, borderRadius: "10%" }}></div>
+          <div style={{ width: "11px", height: "11px", backgroundColor: SeqTxCol, borderRadius: "10%" }}></div>
           <span style={{ fontSize: "12px" }}>Sequencer transaction</span>
         </div>
 
