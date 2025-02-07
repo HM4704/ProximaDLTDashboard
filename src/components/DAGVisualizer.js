@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import Viva from "vivagraphjs";
 
-const NormalTxCol = "#9D98E6"; // Purple
-const SeqTxCol = "#FF5733"; // Orange
-const BranchTxCol = "#FFD700"; // Gold
-const EndorseLinkCol =  "#aaa";//"#FF5733"; // Orange
-const NormalLinkCol =  "#FF5733"; // "#aaa"; // Gray
-const SeqPredLinkCol = "#008000"; // Green
+const NormalTxCol = "#3737F0"; //rgb(55, 55, 236); // "#9D98E6"; // Purple
+const SeqTxCol =  "#008080";  // "#000000";  // "#FFD700";   // "#FF5733"; // Orange
+const BranchTxCol =  "#FF5733"; // "#FFD700"; // Gold
+const EndorseLinkCol = "#FF5733"; // Orange
+const NormalLinkCol =  "#aaa"; // Gray
+const SeqPredLinkCol = "#9F9FFA";  //rgb(159, 159, 250); //"#F38D86"//"#aaa";   //"#008000"; // Green #9F9FFA
 const StemPredLinkCol = "#FF00FF"; // Magenta
 
 const DAGVisualizer = () => {
@@ -80,7 +80,7 @@ const DAGVisualizer = () => {
     if (!isInitialized) return;
     
     //const ws = new WebSocket("ws://localhost:8080/ws");
-    const ws = new WebSocket("ws://192.168.178.35:8080/ws");
+    const ws = new WebSocket("ws://192.168.178.35:8000/wsapi/v1/dag_vertex_stream");
     
 
     ws.onmessage = (event) => {
@@ -104,14 +104,19 @@ const DAGVisualizer = () => {
     newData.in.forEach((source) => {
       if (!graph.current.getNode(source)) {
         graph.current.addNode(source, { initial: true });
-      }
-    
+      }    
+
+      // if it is branch, you find stem edge and color it.
+      // If not and it is seq, you color seq predecessor
+      // Otherwise grey edge
+
       if (!graph.current.getLink(source, newData.id)) {
-        if (newData.seqid === idx) {
-          graph.current.addLink(source, newData.id, { type: "seqpred" }); // Mark as sequencer predecessor
-        } else 
-        if (newData.stemidx === idx) {
+        var txType = newData.stemidx ? "branch" : newData.seqid ? "sequencer" : "regular";
+        if ((txType === "branch") && (newData.stemidx === idx)) {
           graph.current.addLink(source, newData.id, { type: "stempred" }); // Mark as stem predecessor
+        } else
+        if ((txType === "sequencer") && (newData.seqidx === idx)) {
+          graph.current.addLink(source, newData.id, { type: "seqpred" }); // Mark as sequencer predecessor
         } else {
           graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
         }
@@ -119,17 +124,17 @@ const DAGVisualizer = () => {
       idx++;
     });
     
-    if (newData.endorse) {
-      newData.endorse.forEach((source) => {
-        if (!graph.current.getNode(source)) {
-          graph.current.addNode(source, { initial: true });
-        }
+    // if (newData.endorse) {
+    //   newData.endorse.forEach((source) => {
+    //     if (!graph.current.getNode(source)) {
+    //       graph.current.addNode(source, { initial: true });
+    //     }
     
-        if (!graph.current.getLink(source, newData.id)) {
-          graph.current.addLink(source, newData.id, { type: "endorse" }); // Mark as endorsement
-        }
-      });
-    }
+    //     if (!graph.current.getLink(source, newData.id)) {
+    //       graph.current.addLink(source, newData.id, { type: "endorse" }); // Mark as endorsement
+    //     }
+    //   });
+    // }
 
   };
 
@@ -156,7 +161,7 @@ const DAGVisualizer = () => {
         {/* Node Types */}
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{ width: "10px", height: "10px", backgroundColor: NormalTxCol, borderRadius: "10%" }}></div>
-          <span style={{ fontSize: "13px" }}>Normal transaction</span>
+          <span style={{ fontSize: "13px" }}>Non-sequencer transaction</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -177,12 +182,12 @@ const DAGVisualizer = () => {
           <span style={{ fontSize: "13px" }}>Input dependency</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+        {/* <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{
             width: "20px", height: "2px", backgroundColor: EndorseLinkCol
           }}></div>
           <span style={{ fontSize: "13px" }}>Endorsement dependency</span>
-        </div>
+        </div> */}
 
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
