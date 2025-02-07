@@ -3,8 +3,11 @@ import Viva from "vivagraphjs";
 
 const NormalTxCol = "#9D98E6"; // Purple
 const SeqTxCol = "#FF5733"; // Orange
-const EndorseLinkCol = "#FF5733"; // Orange
-const NormalLinkCol = "#aaa"; // Gray
+const BranchTxCol = "#FFD700"; // Gold
+const EndorseLinkCol =  "#aaa";//"#FF5733"; // Orange
+const NormalLinkCol =  "#FF5733"; // "#aaa"; // Gray
+const SeqPredLinkCol = "#008000"; // Green
+const StemPredLinkCol = "#FF00FF"; // Magenta
 
 const DAGVisualizer = () => {
   const containerRef = useRef(null);
@@ -22,7 +25,10 @@ const DAGVisualizer = () => {
     graphics.node((node) => {
       // const size = node.data?.initial ? 15 : 15; // Start small, then grow
 
-      if (node.data && node.data.type === "sequencer") {
+      if (node.data && node.data.type === "branch") {
+        return Viva.Graph.View.webglSquare(12, BranchTxCol); // Gold square for Branch
+      } else
+        if (node.data && node.data.type === "sequencer") {
         return Viva.Graph.View.webglSquare(11, SeqTxCol); // Orange square for Sequencer
       }
       return Viva.Graph.View.webglSquare(10, NormalTxCol); // Initial small size, gold color ADD8E6
@@ -30,10 +36,16 @@ const DAGVisualizer = () => {
 
     // Custom link appearance: Normal vs. Endorsement (dashed)
     graphics.link((link) => {
-      if (link.data && link.data.type === "endorse") {
-        return Viva.Graph.View.webglLine(EndorseLinkCol, 1, true); // orange for endorsements
+      if (link.data) {
+        if  (link.data.type === "endorse") {
+          return Viva.Graph.View.webglLine(EndorseLinkCol, 1, true); // orange for endorsements
+        } else if (link.data.type === "seqpred") {
+          return Viva.Graph.View.webglLine(SeqPredLinkCol, 1); // Green for sequencer predecessors
+        } else if (link.data.type === "stempred") {
+          return Viva.Graph.View.webglLine(StemPredLinkCol, 1); // Magenta for stem predecessors
+        }
+        return Viva.Graph.View.webglLine(NormalLinkCol, 1); // Normal links
       }
-      return Viva.Graph.View.webglLine(NormalLinkCol, 4); // Normal links
     });
 
     // springLength
@@ -80,7 +92,7 @@ const DAGVisualizer = () => {
 
       if (!graph.current.getNode(newData.id)) {
         graph.current.addNode(newData.id, { initial: true, 
-          type: newData.seqid ? "sequencer" : "regular", // Define type
+          type: newData.stemidx ? "branch" : newData.seqid ? "sequencer" : "regular", // Define type
            });  // gold
         
         setTimeout(() => {
@@ -88,14 +100,23 @@ const DAGVisualizer = () => {
         }, 500);
       }
 
+    var idx = 0;
     newData.in.forEach((source) => {
       if (!graph.current.getNode(source)) {
         graph.current.addNode(source, { initial: true });
       }
     
       if (!graph.current.getLink(source, newData.id)) {
-        graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
+        if (newData.seqid === idx) {
+          graph.current.addLink(source, newData.id, { type: "seqpred" }); // Mark as sequencer predecessor
+        } else 
+        if (newData.stemidx === idx) {
+          graph.current.addLink(source, newData.id, { type: "stempred" }); // Mark as stem predecessor
+        } else {
+          graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
+        }
       }
+      idx++;
     });
     
     if (newData.endorse) {
@@ -135,12 +156,17 @@ const DAGVisualizer = () => {
         {/* Node Types */}
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{ width: "10px", height: "10px", backgroundColor: NormalTxCol, borderRadius: "10%" }}></div>
-          <span style={{ fontSize: "12px" }}>Normal transaction</span>
+          <span style={{ fontSize: "13px" }}>Normal transaction</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{ width: "11px", height: "11px", backgroundColor: SeqTxCol, borderRadius: "10%" }}></div>
-          <span style={{ fontSize: "12px" }}>Sequencer transaction</span>
+          <span style={{ fontSize: "13px" }}>Sequencer transaction</span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <div style={{ width: "12px", height: "12px", backgroundColor: BranchTxCol, borderRadius: "10%" }}></div>
+          <span style={{ fontSize: "13px" }}>Branch transaction</span>
         </div>
 
         {/* Link Types */}
@@ -148,15 +174,31 @@ const DAGVisualizer = () => {
           <div style={{
             width: "20px", height: "2px", backgroundColor: NormalLinkCol
           }}></div>
-          <span style={{ fontSize: "12px" }}>Input dependency</span>
+          <span style={{ fontSize: "13px" }}>Input dependency</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{
             width: "20px", height: "2px", backgroundColor: EndorseLinkCol
           }}></div>
-          <span style={{ fontSize: "12px" }}>Endorsement dependency</span>
+          <span style={{ fontSize: "13px" }}>Endorsement dependency</span>
         </div>
+
+
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <div style={{
+            width: "20px", height: "2px", backgroundColor: SeqPredLinkCol
+          }}></div>
+          <span style={{ fontSize: "13px" }}>Sequ predecessor dependency</span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <div style={{
+            width: "20px", height: "2px", backgroundColor: StemPredLinkCol
+          }}></div>
+          <span style={{ fontSize: "13px" }}>Stem predecessor dependency</span>
+        </div>
+
       </div>
     </div>
   );
