@@ -77,49 +77,122 @@ const DAGVisualizer = () => {
     setIsInitialized(true);
   }, []);
 
+  const maxPosition = useRef({ x: 0, y: 0 }); // Track the farthest X, Y position
+
+  // const startTime = useRef(Date.now()); // Capture start time
+  // const recentBranches = useRef([]); // Cache for recent branch positions
+  // const baseRadius = 50; // Initial radius
+  // const timeToFullCircle = 120000; // 2 minutes
+  // const spreadAngle = Math.PI / 6; // Spread new nodes in a 30° arc
+
   useEffect(() => {
     if (!isInitialized) return;
     
+
     const ws = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
     ws.onmessage = (event) => {
       const newData = JSON.parse(event.data);
 
-      console.log(
-        'Received Message: ' + event.data.toString()
-      )
+      //console.log('Received Message: ' + event.data.toString())
 
       if (!graph.current.getNode(newData.id)) {
-        graph.current.addNode(newData.id, { initial: true, 
-          type: (newData.stemidx !== undefined) ? "branch" : (newData.seqid !== undefined) ? "sequencer" : "regular", // Define type
-           }); 
-        
+
+        // let newX, newY;
+        // const now = Date.now();
+        // const elapsed = now - startTime.current;
+    
+        // // Correctly determine the node type
+        // const nodeType = newData.stemidx !== undefined
+        //   ? "branch"
+        //   : newData.seqid !== undefined
+        //   ? "sequencer"
+        //   : "regular";
+    
+        // if (nodeType === "branch") {
+        //   // If it's a branch, update our recent branch cache
+        //   if (recentBranches.current.length >= 10) {
+        //     recentBranches.current.shift(); // Remove oldest branch
+        //   }
+    
+        //   // Compute new branch position at the "front"
+        //   const angle = (elapsed % timeToFullCircle) / timeToFullCircle * 2 * Math.PI;
+        //   const radius = baseRadius + elapsed / 1000;
+    
+        //   newX = Math.cos(angle) * radius;
+        //   newY = Math.sin(angle) * radius;
+    
+        //   recentBranches.current.push({ x: newX, y: newY });
+        // } else {
+        //   // If it's NOT a branch, place it in front of the latest branch nodes
+        //   if (recentBranches.current.length > 0) {
+        //     const refBranch = recentBranches.current[recentBranches.current.length - 1]; // Use last branch
+    
+        //     const angleOffset = (Math.random() - 0.5) * spreadAngle; // Spread new nodes slightly
+        //     const distance = 30; // Distance in front of the DAG
+    
+        //     newX = refBranch.x + Math.cos(angleOffset) * distance;
+        //     newY = refBranch.y + Math.sin(angleOffset) * distance;
+        //   } else {
+        //     // Fallback if no branches exist yet
+        //     newX = Math.cos(elapsed / timeToFullCircle * 2 * Math.PI) * (baseRadius + 50);
+        //     newY = Math.sin(elapsed / timeToFullCircle * 2 * Math.PI) * (baseRadius + 50);
+        //   }
+        // }
+    
+        // // Add node with the correct type
+        // graph.current.addNode(newData.id, { initial: true, type: nodeType });
+        // layout.current.setNodePosition(newData.id, newX, newY);
+    
+        // setTimeout(() => {
+        //   graph.current.getNode(newData.id).data.initial = false;
+        // }, 500);
+
+
+        // Compute new node position based on last known farthest point
+        const newX = maxPosition.current.x + 3; // Shift right
+        const newY = maxPosition.current.y + 0; // Shift down
+
+        graph.current.addNode(newData.id, { 
+          initial: true, 
+          type: (newData.stemidx !== undefined) ? "branch" : 
+                (newData.seqid !== undefined) ? "sequencer" : "regular"
+        });
+
+        layout.current.setNodePosition(newData.id, newX, newY);
+
+        // Update max position (track the farthest point dynamically)
+        maxPosition.current.x = newX;
+        maxPosition.current.y = newY;
+
         setTimeout(() => {
           graph.current.getNode(newData.id).data.initial = false;
         }, 500);
+        
+    
       }
 
-    var idx = 0;
-    newData.in.forEach((source) => {
-      if (!graph.current.getNode(source)) {
-        graph.current.addNode(source, { initial: true });
-      }    
+      let idx = 0;
+      newData.in.forEach((source) => {
+        if (!graph.current.getNode(source)) {
+          graph.current.addNode(source, { initial: true });
+        }    
 
-      // if it is branch, you find stem edge and color it.
-      // If not and it is seq, you color seq predecessor
-      // Otherwise grey edge
+        // if it is branch, you find stem edge and color it.
+        // If not and it is seq, you color seq predecessor
+        // Otherwise grey edge
 
-      if (!graph.current.getLink(source, newData.id)) {
-        if ((newData.stemidx !== undefined) && (newData.stemidx === idx)) {
-          graph.current.addLink(source, newData.id, { type: "stempred" }); // Mark as stem predecessor
-        } else
-        if ((newData.seqid !== undefined) && (newData.seqidx === idx)) {
-          graph.current.addLink(source, newData.id, { type: "seqpred" }); // Mark as sequencer predecessor
-        } else {
-          graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
+        if (!graph.current.getLink(source, newData.id)) {
+          if ((newData.stemidx !== undefined) && (newData.stemidx === idx)) {
+            graph.current.addLink(source, newData.id, { type: "stempred" }); // Mark as stem predecessor
+          } else
+          if ((newData.seqid !== undefined) && (newData.seqidx === idx)) {
+            graph.current.addLink(source, newData.id, { type: "seqpred" }); // Mark as sequencer predecessor
+          } else {
+            graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
+          }
         }
-      }
-      idx++;
-    });
+        idx++;
+      });
     
     // if (newData.endorse) {
     //   newData.endorse.forEach((source) => {
