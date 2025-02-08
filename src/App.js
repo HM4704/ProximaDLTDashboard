@@ -22,7 +22,7 @@ function App() {
         const newUrl = e.target.value;
         setBaseUrl(newUrl);
         config.baseUrl = newUrl
-        //localStorage.setItem('baseUrl', newUrl);
+        localStorage.setItem('baseUrl', newUrl);
     };
 
       
