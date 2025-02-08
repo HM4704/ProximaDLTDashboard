@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import Viva from "vivagraphjs";
+import config from './../config';  // Import the configuration
 
 const NormalTxCol = "#3737F0"; //rgb(55, 55, 236); // "#9D98E6"; // Purple
 const SeqTxCol =  "#008080";  // "#000000";  // "#FFD700";   // "#FF5733"; // Orange
 const BranchTxCol =  "#FF5733"; // "#FFD700"; // Gold
 const EndorseLinkCol = "#FF5733"; // Orange
 const NormalLinkCol =  "#aaa"; // Gray
-const SeqPredLinkCol = "#9F9FFA";  //rgb(159, 159, 250); //"#F38D86"//"#aaa";   //"#008000"; // Green #9F9FFA
+const SeqPredLinkCol = "#9F9FFA";  //rgb(159, 159, 250); //"#F38D86"
 const StemPredLinkCol = "#FF00FF"; // Magenta
 
 const DAGVisualizer = () => {
@@ -17,7 +18,7 @@ const DAGVisualizer = () => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    if (!containerRef.current || renderer.current) return; // ✅ Prevent multiple initializations
+    if (!containerRef.current || renderer.current) return; // Prevent multiple initializations
 
     const graphics = Viva.Graph.View.webglGraphics();
 
@@ -79,10 +80,7 @@ const DAGVisualizer = () => {
   useEffect(() => {
     if (!isInitialized) return;
     
-    //const ws = new WebSocket("ws://localhost:8080/ws");
-    const ws = new WebSocket("ws://192.168.178.35:8000/wsapi/v1/dag_vertex_stream");
-    
-
+    const ws = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
     ws.onmessage = (event) => {
       const newData = JSON.parse(event.data);
 
