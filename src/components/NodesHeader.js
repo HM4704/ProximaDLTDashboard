@@ -5,7 +5,7 @@ const Header = () => {
   return (
     <thead>
       <tr>
-        <th>IP</th>
+        {/* <th>IP</th> */}
         <th>ID</th>
         <th># Peers</th>
         <th>Synced</th>
