@@ -90,8 +90,8 @@ const DAGVisualizer = () => {
 
       if (!graph.current.getNode(newData.id)) {
         graph.current.addNode(newData.id, { initial: true, 
-          type: newData.stemidx ? "branch" : newData.seqid ? "sequencer" : "regular", // Define type
-           });  // gold
+          type: (newData.stemidx !== undefined) ? "branch" : (newData.seqid !== undefined) ? "sequencer" : "regular", // Define type
+           }); 
         
         setTimeout(() => {
           graph.current.getNode(newData.id).data.initial = false;
@@ -109,11 +109,10 @@ const DAGVisualizer = () => {
       // Otherwise grey edge
 
       if (!graph.current.getLink(source, newData.id)) {
-        var txType = newData.stemidx ? "branch" : newData.seqid ? "sequencer" : "regular";
-        if ((txType === "branch") && (newData.stemidx === idx)) {
+        if ((newData.stemidx !== undefined) && (newData.stemidx === idx)) {
           graph.current.addLink(source, newData.id, { type: "stempred" }); // Mark as stem predecessor
         } else
-        if ((txType === "sequencer") && (newData.seqidx === idx)) {
+        if ((newData.seqid !== undefined) && (newData.seqidx === idx)) {
           graph.current.addLink(source, newData.id, { type: "seqpred" }); // Mark as sequencer predecessor
         } else {
           graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
