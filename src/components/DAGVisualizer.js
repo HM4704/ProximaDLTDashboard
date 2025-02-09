@@ -21,6 +21,7 @@ const DAGVisualizer = () => {
   const [showEndorsements, setShowEndorsements] = useState(false);
   const [wsError, setWsError] = useState(""); // Store WebSocket errors
   const [isPaused, setIsPaused] = useState(false); // DAG display pause state
+  const [hoveredNodeData, setHoveredNodeData] = useState(null);
 
   useEffect(() => {
     if (!containerRef.current || renderer.current) return;
@@ -72,6 +73,17 @@ const DAGVisualizer = () => {
 
     renderer.current.run();
     setIsInitialized(true);
+
+    // Mouse events for showing node info
+    const events = Viva.Graph.webglInputEvents(graphics, graph.current);
+    events.mouseEnter((node) => {
+      setHoveredNodeData(node.data);
+    });
+
+    events.mouseLeave(() => {
+      setHoveredNodeData(null);
+    });
+
   }, [showEndorsements]);
 
   useEffect(() => {
@@ -106,6 +118,7 @@ const DAGVisualizer = () => {
     ws.current.onopen = () => {
       console.log("WebSocket connected");
       setWsError(""); // Clear error if connected
+      renderer.current.rerender();
     };
 
     ws.current.onerror = () => {
@@ -126,11 +139,18 @@ const DAGVisualizer = () => {
       if (isPaused) return; // Ignore new updates when paused
 
       const newData = JSON.parse(event.data);
-      // console.log("Received Message: " + event.data.toString());
+      //console.log("Received Message: " + event.data.toString());
 
       if (!graph.current.getNode(newData.id)) {
         graph.current.addNode(newData.id, {
           initial: true,
+          id: newData.id,
+          a: newData.a,
+          i: newData.i,
+          seqid: newData.seqid,
+          seqidx: newData.seqidx,
+          in: newData.in,
+          endorse: newData.endorse,          
           type: newData.stemidx !== undefined ? "branch" : newData.seqid !== undefined ? "sequencer" : "regular",
         });
 
@@ -141,49 +161,55 @@ const DAGVisualizer = () => {
 
       let idx = 0;
       newData.in.forEach((source) => {
-        if (!graph.current.getNode(source)) {
-          graph.current.addNode(source, { initial: true });
-        }
+        // if (!graph.current.getNode(source)) {
+        //   graph.current.addNode(source, { initial: true });
+        // }
 
       // if it is branch, you find stem edge and color it.
       // If not and it is seq, you color seq predecessor
       // Otherwise grey edge
 
-        if (!graph.current.getLink(source, newData.id)) {
-          const linkType =
-            newData.stemidx !== undefined && newData.stemidx === idx
-              ? "stempred"
-              : newData.seqid !== undefined && newData.seqidx === idx
-              ? "seqpred"
-              : "input";
+        if (graph.current.getNode(source)) {
+          // only add link if node exists
+          if (!graph.current.getLink(source, newData.id)) {
+            const linkType =
+              newData.stemidx !== undefined && newData.stemidx === idx
+                ? "stempred"
+                : newData.seqid !== undefined && newData.seqidx === idx
+                ? "seqpred"
+                : "input";
 
-          graph.current.addLink(source, newData.id, { type: linkType });
+            graph.current.addLink(source, newData.id, { type: linkType });
+          }
         }
         idx++;
       });
 
       if (newData.endorse) {
         newData.endorse.forEach((source) => {
-          if (!graph.current.getNode(source)) {
-            graph.current.addNode(source, { initial: true });
-          }
+          // if (!graph.current.getNode(source)) {
+          //   graph.current.addNode(source, { initial: true });
+          // }
+          if (graph.current.getNode(source)) {
+            // only add link if node exists
+  
+            if (!graph.current.getLink(source, newData.id)) {
+              const color = showEndorsements ? EndorseLinkVisCol : EndorseLinkHidCol;
+              graph.current.addLink(source, newData.id, { type: "endorse", color });
 
-          if (!graph.current.getLink(source, newData.id)) {
-            const color = showEndorsements ? EndorseLinkVisCol : EndorseLinkHidCol;
-            graph.current.addLink(source, newData.id, { type: "endorse", color });
-
-            // Update the new link color
-            setTimeout(() => {
-              const graphics = renderer.current.getGraphics();
-              const link = graph.current.getLink(source, newData.id);
-              if (link) {
-                const linkUI = graphics.getLinkUI(link.id);
-                if (linkUI) {
-                  linkUI.color = Viva.Graph.View._webglUtil.parseColor(color);
-                  renderer.current.rerender();
+              // Update the new link color
+              setTimeout(() => {
+                const graphics = renderer.current.getGraphics();
+                const link = graph.current.getLink(source, newData.id);
+                if (link) {
+                  const linkUI = graphics.getLinkUI(link.id);
+                  if (linkUI) {
+                    linkUI.color = Viva.Graph.View._webglUtil.parseColor(color);
+                    renderer.current.rerender();
+                  }
                 }
-              }
-            }, 0);
+              }, 0);
+            }
           }
         });
       }
@@ -221,6 +247,37 @@ const DAGVisualizer = () => {
           }}
         >
           {wsError}
+        </div>
+      )}
+
+      {/* Node Info Box */}
+      {hoveredNodeData && (
+        <div
+          style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            width: "450px",
+            backgroundColor: "white",
+            padding: "10px",
+            borderRadius: "5px",
+            boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
+            fontSize: "13px",
+          }}
+        >
+          <strong>ID:</strong> {hoveredNodeData.id}
+          <br />
+          <strong>a:</strong> {hoveredNodeData.a}
+          <br />
+          <strong>i:</strong> {hoveredNodeData.i}
+          <br />
+          <strong>seqid:</strong> {hoveredNodeData.seqid}
+          <br />
+          <strong>seqidx:</strong> {hoveredNodeData.seqidx}
+          <br />
+          <strong>in:</strong> {hoveredNodeData.in?.join(", ")}
+          <br />
+          <strong>endorse:</strong> {hoveredNodeData.endorse?.join(", ")}
         </div>
       )}
 
