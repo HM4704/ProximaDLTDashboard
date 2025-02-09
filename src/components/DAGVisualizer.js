@@ -19,6 +19,7 @@ const DAGVisualizer = () => {
   const ws = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showEndorsements, setShowEndorsements] = useState(false);
+  const [wsError, setWsError] = useState(""); // Store WebSocket errors
 
   useEffect(() => {
     if (!containerRef.current || renderer.current) return;
@@ -101,6 +102,24 @@ const DAGVisualizer = () => {
 
     ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
 
+    ws.current.onopen = () => {
+      console.log("WebSocket connected");
+      setWsError(""); // Clear error if connected
+    };
+
+    ws.current.onerror = () => {
+      setWsError("WebSocket connection failed. Please check the server.");
+    };
+
+    ws.current.onclose = () => {
+      setWsError("WebSocket disconnected. Trying to reconnect...");
+      setTimeout(() => {
+        if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
+          ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
+        }
+      }, 3000); // Attempt reconnect after 3 seconds
+    };
+
     ws.current.onmessage = (event) => {
       const newData = JSON.parse(event.data);
       // console.log("Received Message: " + event.data.toString());
@@ -177,6 +196,25 @@ const DAGVisualizer = () => {
     <div style={{ position: "relative", width: "100%", height: "800px" }}>
       {/* Graph Container */}
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+
+      {/* WebSocket Error Message */}
+      {wsError && (
+        <div
+          style={{
+            position: "absolute",
+            top: "10px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "#ff4d4d",
+            color: "white",
+            padding: "10px",
+            borderRadius: "5px",
+            boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
+          }}
+        >
+          {wsError}
+        </div>
+      )}
 
       {/* Endorsements Toggle Checkbox */}
       <div
