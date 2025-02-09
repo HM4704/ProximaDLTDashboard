@@ -5,7 +5,8 @@ import config from './../config';  // Import the configuration
 const NormalTxCol = "#3737F0"; //rgb(55, 55, 236); // "#9D98E6"; // Purple
 const SeqTxCol =  "#008080";  // "#000000";  // "#FFD700";   // "#FF5733"; // Orange
 const BranchTxCol =  "#FF5733"; // "#FFD700"; // Gold
-const EndorseLinkCol = "#FF5733"; // Orange
+const EndorseLinkVisCol = "#FF573398"; // Orange
+const EndorseLinkHidCol = "#FF573300"; // Orange
 const NormalLinkCol =  "#aaa"; // Gray
 const SeqPredLinkCol = "#9F9FFA";  //rgb(159, 159, 250); //"#F38D86"
 const StemPredLinkCol = "#FF00FF"; // Magenta
@@ -15,38 +16,32 @@ const DAGVisualizer = () => {
   const graph = useRef(Viva.Graph.graph());
   const renderer = useRef(null);
   const layout = useRef(null);
+  const ws = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showEndorsements, setShowEndorsements] = useState(false);
 
   useEffect(() => {
-    if (!containerRef.current || renderer.current) return; // Prevent multiple initializations
+    if (!containerRef.current || renderer.current) return;
 
     const graphics = Viva.Graph.View.webglGraphics();
 
-    // Custom node appearance with animation
     graphics.node((node) => {
-      // const size = node.data?.initial ? 15 : 15; // Start small, then grow
-
-      if (node.data && node.data.type === "branch") {
-        return Viva.Graph.View.webglSquare(12, BranchTxCol); // Gold square for Branch
-      } else
-        if (node.data && node.data.type === "sequencer") {
-        return Viva.Graph.View.webglSquare(11, SeqTxCol); // Orange square for Sequencer
-      }
-      return Viva.Graph.View.webglSquare(10, NormalTxCol); // Initial small size, gold color ADD8E6
+      if (node.data?.type === "branch") return Viva.Graph.View.webglSquare(12, BranchTxCol);
+      if (node.data?.type === "sequencer") return Viva.Graph.View.webglSquare(11, SeqTxCol);
+      return Viva.Graph.View.webglSquare(10, NormalTxCol);
     });
 
     // Custom link appearance: Normal vs. Endorsement (dashed)
     graphics.link((link) => {
-      if (link.data) {
-        if  (link.data.type === "endorse") {
-          return Viva.Graph.View.webglLine(EndorseLinkCol, 1, true); // orange for endorsements
-        } else if (link.data.type === "seqpred") {
-          return Viva.Graph.View.webglLine(SeqPredLinkCol, 1); // Green for sequencer predecessors
-        } else if (link.data.type === "stempred") {
-          return Viva.Graph.View.webglLine(StemPredLinkCol, 1); // Magenta for stem predecessors
-        }
-        return Viva.Graph.View.webglLine(NormalLinkCol, 1); // Normal links
+      if (link.data?.type === "endorse") {
+        const col = showEndorsements ? EndorseLinkVisCol : EndorseLinkHidCol;
+        return Viva.Graph.View.webglLine(col);
+      } else if (link.data?.type === "seqpred") {
+        return Viva.Graph.View.webglLine(SeqPredLinkCol);
+      } else if (link.data?.type === "stempred") {
+        return Viva.Graph.View.webglLine(StemPredLinkCol);
       }
+      return Viva.Graph.View.webglLine(NormalLinkCol);
     });
 
     // springLength
@@ -56,10 +51,10 @@ const DAGVisualizer = () => {
     //   0.0002 for endorsement links → Makes them looser/stretchier
     //   0.0008 for input links → Keeps them tighter
 
-     layout.current = Viva.Graph.Layout.forceDirected(graph.current, {
+    layout.current = Viva.Graph.Layout.forceDirected(graph.current, {
       dragCoeff: 0.02,
       gravity: -0.5,
-      theta: 0.8,     
+      theta: 0.8,
       
       springTransform: function (link, spring) {
         spring.length = (link.data?.type === "endorse" ? 55 : 35)
@@ -75,92 +70,148 @@ const DAGVisualizer = () => {
 
     renderer.current.run();
     setIsInitialized(true);
-  }, []);
+  }, [showEndorsements]);
+
+  useEffect(() => {
+    if (!isInitialized || !renderer.current) return;
+
+    const graphics = renderer.current.getGraphics();
+    const graphInstance = graph.current;
+
+    graphInstance.forEachLink((link) => {
+      if (link.data?.type === "endorse") {
+        const color = showEndorsements ? EndorseLinkVisCol : EndorseLinkHidCol;
+        const linkUI = graphics.getLinkUI(link.id);
+        if (linkUI) {
+          linkUI.color = Viva.Graph.View._webglUtil.parseColor(color);
+        }
+      }
+    });
+
+    renderer.current.rerender();
+  }, [showEndorsements, isInitialized]);
 
   useEffect(() => {
     if (!isInitialized) return;
-    
-    const ws = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
-    ws.onmessage = (event) => {
-      const newData = JSON.parse(event.data);
 
-      console.log(
-        'Received Message: ' + event.data.toString()
-      )
+    if (ws.current) {
+      ws.current.close();
+      ws.current = null;
+    }
+
+    ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
+
+    ws.current.onmessage = (event) => {
+      const newData = JSON.parse(event.data);
+      // console.log("Received Message: " + event.data.toString());
 
       if (!graph.current.getNode(newData.id)) {
-        graph.current.addNode(newData.id, { initial: true, 
-          type: (newData.stemidx !== undefined) ? "branch" : (newData.seqid !== undefined) ? "sequencer" : "regular", // Define type
-           }); 
-        
+        graph.current.addNode(newData.id, {
+          initial: true,
+          type: newData.stemidx !== undefined ? "branch" : newData.seqid !== undefined ? "sequencer" : "regular",
+        });
+
         setTimeout(() => {
           graph.current.getNode(newData.id).data.initial = false;
         }, 500);
       }
 
-    var idx = 0;
-    newData.in.forEach((source) => {
-      if (!graph.current.getNode(source)) {
-        graph.current.addNode(source, { initial: true });
-      }    
+      let idx = 0;
+      newData.in.forEach((source) => {
+        if (!graph.current.getNode(source)) {
+          graph.current.addNode(source, { initial: true });
+        }
 
       // if it is branch, you find stem edge and color it.
       // If not and it is seq, you color seq predecessor
       // Otherwise grey edge
 
-      if (!graph.current.getLink(source, newData.id)) {
-        if ((newData.stemidx !== undefined) && (newData.stemidx === idx)) {
-          graph.current.addLink(source, newData.id, { type: "stempred" }); // Mark as stem predecessor
-        } else
-        if ((newData.seqid !== undefined) && (newData.seqidx === idx)) {
-          graph.current.addLink(source, newData.id, { type: "seqpred" }); // Mark as sequencer predecessor
-        } else {
-          graph.current.addLink(source, newData.id, { type: "input" }); // Mark as input link
-        }
-      }
-      idx++;
-    });
-    
-    // if (newData.endorse) {
-    //   newData.endorse.forEach((source) => {
-    //     if (!graph.current.getNode(source)) {
-    //       graph.current.addNode(source, { initial: true });
-    //     }
-    
-    //     if (!graph.current.getLink(source, newData.id)) {
-    //       graph.current.addLink(source, newData.id, { type: "endorse" }); // Mark as endorsement
-    //     }
-    //   });
-    // }
+        if (!graph.current.getLink(source, newData.id)) {
+          const linkType =
+            newData.stemidx !== undefined && newData.stemidx === idx
+              ? "stempred"
+              : newData.seqid !== undefined && newData.seqidx === idx
+              ? "seqpred"
+              : "input";
 
+          graph.current.addLink(source, newData.id, { type: linkType });
+        }
+        idx++;
+      });
+
+      if (newData.endorse) {
+        newData.endorse.forEach((source) => {
+          if (!graph.current.getNode(source)) {
+            graph.current.addNode(source, { initial: true });
+          }
+
+          if (!graph.current.getLink(source, newData.id)) {
+            const color = showEndorsements ? EndorseLinkVisCol : EndorseLinkHidCol;
+            graph.current.addLink(source, newData.id, { type: "endorse", color });
+
+            // Update the new link color
+            setTimeout(() => {
+              const graphics = renderer.current.getGraphics();
+              const link = graph.current.getLink(source, newData.id);
+              if (link) {
+                const linkUI = graphics.getLinkUI(link.id);
+                if (linkUI) {
+                  linkUI.color = Viva.Graph.View._webglUtil.parseColor(color);
+                  renderer.current.rerender();
+                }
+              }
+            }, 0);
+          }
+        });
+      }
+    };
+
+    return () => ws.current && ws.current.close();
+  }, [isInitialized, showEndorsements]);
+
+  const toggleEndorsements = () => {
+    setShowEndorsements((prev) => !prev);
   };
 
-    return () => ws.close();
-  }, [isInitialized]);
-
-  // return <div ref={containerRef} style={{ width: "100%", height: "800px" }} />;
   return (
     <div style={{ position: "relative", width: "100%", height: "800px" }}>
       {/* Graph Container */}
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
 
-      {/* Legend Box */}
-      <div style={{
-        position: "absolute",
-        bottom: "20px",
-        right: "20px",
-        backgroundColor: "rgba(255, 255, 255, 0.8)",
-        padding: "10px",
-        borderRadius: "5px",
-        boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
-      }}>
+      {/* Endorsements Toggle Checkbox */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "155px",
+          right: "20px",
+          backgroundColor: "white",
+          padding: "10px",
+          borderRadius: "5px",
+          boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
+        }}
+      >
+        <label>
+          <input type="checkbox" checked={showEndorsements} onChange={toggleEndorsements} />
+          Show Endorsements
+        </label>
+      </div>
 
-        {/* Node Types */}
+      {/* Legend Box */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "20px",
+          right: "20px",
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          padding: "10px",
+          borderRadius: "5px",
+          boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{ width: "10px", height: "10px", backgroundColor: NormalTxCol, borderRadius: "10%" }}></div>
           <span style={{ fontSize: "13px" }}>Non-sequencer transaction</span>
         </div>
-
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{ width: "11px", height: "11px", backgroundColor: SeqTxCol, borderRadius: "10%" }}></div>
           <span style={{ fontSize: "13px" }}>Sequencer transaction</span>
@@ -179,13 +230,12 @@ const DAGVisualizer = () => {
           <span style={{ fontSize: "13px" }}>Input dependency</span>
         </div>
 
-        {/* <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{
-            width: "20px", height: "2px", backgroundColor: EndorseLinkCol
+            width: "20px", height: "2px", backgroundColor: EndorseLinkVisCol
           }}></div>
           <span style={{ fontSize: "13px" }}>Endorsement dependency</span>
-        </div> */}
-
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <div style={{
@@ -194,12 +244,12 @@ const DAGVisualizer = () => {
           <span style={{ fontSize: "13px" }}>Sequ predecessor dependency</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <div style={{
-            width: "20px", height: "2px", backgroundColor: StemPredLinkCol
-          }}></div>
-          <span style={{ fontSize: "13px" }}>Stem predecessor dependency</span>
-        </div>
+       <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+           <div style={{
+             width: "20px", height: "2px", backgroundColor: StemPredLinkCol
+           }}></div>
+           <span style={{ fontSize: "13px" }}>Stem predecessor dependency</span>
+       </div>
 
       </div>
     </div>
