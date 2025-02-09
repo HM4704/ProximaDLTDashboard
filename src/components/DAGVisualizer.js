@@ -20,6 +20,7 @@ const DAGVisualizer = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [showEndorsements, setShowEndorsements] = useState(false);
   const [wsError, setWsError] = useState(""); // Store WebSocket errors
+  const [isPaused, setIsPaused] = useState(false); // DAG display pause state
 
   useEffect(() => {
     if (!containerRef.current || renderer.current) return;
@@ -121,6 +122,9 @@ const DAGVisualizer = () => {
     };
 
     ws.current.onmessage = (event) => {
+
+      if (isPaused) return; // Ignore new updates when paused
+
       const newData = JSON.parse(event.data);
       // console.log("Received Message: " + event.data.toString());
 
@@ -186,10 +190,14 @@ const DAGVisualizer = () => {
     };
 
     return () => ws.current && ws.current.close();
-  }, [isInitialized, showEndorsements]);
+  }, [isInitialized, showEndorsements, isPaused]);
 
   const toggleEndorsements = () => {
     setShowEndorsements((prev) => !prev);
+  };
+
+  const togglePause = () => {
+    setIsPaused((prev) => !prev);
   };
 
   return (
@@ -215,6 +223,22 @@ const DAGVisualizer = () => {
           {wsError}
         </div>
       )}
+
+      {/* Control Buttons */}
+      <div style={{ 
+
+          //position: "absolute", bottom: "80px", right: "20px", display: "flex", flexDirection: "column", gap: "10px" 
+          position: "absolute",
+          bottom: "200px",
+          right: "20px",
+          backgroundColor: "white",
+          padding: "10px",
+          borderRadius: "5px",
+          boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
+        
+        }}>
+        <button onClick={togglePause}>{isPaused ? "Resume DAG" : "Pause DAG"}</button>
+      </div>
 
       {/* Endorsements Toggle Checkbox */}
       <div
@@ -288,7 +312,7 @@ const DAGVisualizer = () => {
            }}></div>
            <span style={{ fontSize: "13px" }}>Stem predecessor dependency</span>
        </div>
-
+      
       </div>
     </div>
   );
