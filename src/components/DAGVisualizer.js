@@ -19,9 +19,13 @@ const DAGVisualizer = () => {
   const ws = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showEndorsements, setShowEndorsements] = useState(false);
-  const [wsError, setWsError] = useState(""); // Store WebSocket errors
+  const [wsError, setWsError] = useState(false); // Store WebSocket errors
   const [isPaused, setIsPaused] = useState(false); // DAG display pause state
   const [hoveredNodeData, setHoveredNodeData] = useState(null);
+  const showEndorsementsRef = useRef(showEndorsements);
+  useEffect(() => {
+    showEndorsementsRef.current = showEndorsements;
+  }, [showEndorsements]);
 
   useEffect(() => {
     if (!containerRef.current || renderer.current) return;
@@ -117,16 +121,17 @@ const DAGVisualizer = () => {
 
     ws.current.onopen = () => {
       console.log("WebSocket connected");
-      setWsError(""); // Clear error if connected
-      renderer.current.rerender();
+      setWsError(false); // Clear error if connected
     };
 
     ws.current.onerror = () => {
-      setWsError("WebSocket connection failed. Please check the server.");
+      setWsError(true);
+      console.log("WebSocket error");
     };
 
     ws.current.onclose = () => {
-      setWsError("WebSocket disconnected. Trying to reconnect...");
+      setWsError(true);
+      console.log("WebSocket closed");
       setTimeout(() => {
         if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
           ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
@@ -140,6 +145,9 @@ const DAGVisualizer = () => {
 
       const newData = JSON.parse(event.data);
       //console.log("Received Message: " + event.data.toString());
+      if (wsError === true) {
+        setWsError(false);
+      }
 
       if (!graph.current.getNode(newData.id)) {
         graph.current.addNode(newData.id, {
@@ -204,11 +212,12 @@ const DAGVisualizer = () => {
                 if (link) {
                   const linkUI = graphics.getLinkUI(link.id);
                   if (linkUI) {
+                    const color = showEndorsementsRef.current ? EndorseLinkVisCol : EndorseLinkHidCol;
                     linkUI.color = Viva.Graph.View._webglUtil.parseColor(color);
                     renderer.current.rerender();
                   }
                 }
-              }, 0);
+              }, 0);              
             }
           }
         });
@@ -216,8 +225,8 @@ const DAGVisualizer = () => {
     };
 
     return () => ws.current && ws.current.close();
-  }, [isInitialized, showEndorsements, isPaused]);
-
+  }, [isInitialized, wsError, isPaused]);
+   
   const toggleEndorsements = () => {
     setShowEndorsements((prev) => !prev);
   };
@@ -246,7 +255,7 @@ const DAGVisualizer = () => {
             boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
           }}
         >
-          {wsError}
+          {"WebSocket disconnected. Trying to reconnect..."}
         </div>
       )}
 
@@ -257,7 +266,7 @@ const DAGVisualizer = () => {
             position: "absolute",
             top: "10px",
             right: "10px",
-            width: "450px",
+            width: "460px",
             backgroundColor: "white",
             padding: "10px",
             borderRadius: "5px",
