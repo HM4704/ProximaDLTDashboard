@@ -11,6 +11,23 @@ const NormalLinkCol =  "#aaa"; // Gray
 const SeqPredLinkCol = "#9F9FFA";  //rgb(159, 159, 250); //"#F38D86"
 const StemPredLinkCol = "#FF00FF"; // Magenta
 
+function getSlotForTxId(txid) {
+  if (typeof txid !== "string" || txid.length < 10) {
+      throw new Error("Invalid transaction ID");
+  }
+
+  // Convert the hex string to a byte array
+  const bytes = new Uint8Array(txid.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+  // Extract the first 4 bytes (slot) and remove the most significant bit of the first byte
+  bytes[0] &= 0x7F; // Clear the highest bit, sequencer bit
+
+  // Convert the first 4 bytes to a big-endian uint32 value
+  const slot = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+
+  return slot >>> 0; // Ensure unsigned 32-bit integer
+}
+
 const DAGVisualizer = () => {
   const containerRef = useRef(null);
   const graph = useRef(Viva.Graph.graph());
@@ -23,6 +40,9 @@ const DAGVisualizer = () => {
   const [isPaused, setIsPaused] = useState(false); // DAG display pause state
   const [hoveredNodeData, setHoveredNodeData] = useState(null);
   const showEndorsementsRef = useRef(showEndorsements);
+  const nodeTimestamps = useRef(new Map());
+  let latestSlot = useRef(0);
+
   useEffect(() => {
     showEndorsementsRef.current = showEndorsements;
   }, [showEndorsements]);
@@ -162,9 +182,9 @@ const DAGVisualizer = () => {
           type: newData.stemidx !== undefined ? "branch" : newData.seqid !== undefined ? "sequencer" : "regular",
         });
 
-        setTimeout(() => {
-          graph.current.getNode(newData.id).data.initial = false;
-        }, 500);
+        // Store the timestamp when the node is added
+        latestSlot.current = getSlotForTxId(newData.id);
+        nodeTimestamps.current.set(newData.id, latestSlot.current);        
       }
 
       let idx = 0;
@@ -227,6 +247,43 @@ const DAGVisualizer = () => {
     return () => ws.current && ws.current.close();
   }, [isInitialized, wsError, isPaused]);
    
+
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const maxSlots = 50;
+      let cleanUp = false;
+  
+      // First cleanup pass: Remove old nodes
+      nodeTimestamps.current.forEach((timestamp, nodeId) => {
+        if (latestSlot.current - timestamp > maxSlots) {
+          if (graph.current.getNode(nodeId)) {
+            // Remove the node
+            graph.current.removeNode(nodeId);
+            nodeTimestamps.current.delete(nodeId);
+            cleanUp = true;
+          }
+        }
+      });
+  
+      // Second cleanup pass: Remove nodes without links from the previous slot
+      if (cleanUp) {
+        nodeTimestamps.current.forEach((timestamp, nodeId) => {
+          if (latestSlot.current - timestamp > maxSlots - 1) {
+            const node = graph.current.getNode(nodeId);
+            if (node && (!graph.current.getLinks(nodeId) || graph.current.getLinks(nodeId).length === 0)) {
+              // Remove nodes without links
+              graph.current.removeNode(nodeId);
+              nodeTimestamps.current.delete(nodeId);
+            }
+          }
+        });
+      }
+    }, 10 * 1000); // Run every 10 seconds
+  
+    return () => clearInterval(cleanupInterval);
+  }, []);
+  
+
   const toggleEndorsements = () => {
     setShowEndorsements((prev) => !prev);
   };
