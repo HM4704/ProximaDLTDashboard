@@ -41,6 +41,9 @@ const DAGVisualizer = () => {
   const [hoveredNodeData, setHoveredNodeData] = useState(null);
   const showEndorsementsRef = useRef(showEndorsements);
   const nodeTimestamps = useRef(new Map());
+  const [txCount, setTxCount] = useState(0);
+  const [tps, setTps] = useState(0);
+  const transactions = useRef([]);
   let latestSlot = useRef(0);
 
   useEffect(() => {
@@ -185,6 +188,8 @@ const DAGVisualizer = () => {
         // Store the timestamp when the node is added
         latestSlot.current = getSlotForTxId(newData.id);
         nodeTimestamps.current.set(newData.id, latestSlot.current);        
+        transactions.current.push(Date.now());        
+        setTxCount((prev) => prev + 1);
       }
 
       let idx = 0;
@@ -283,7 +288,16 @@ const DAGVisualizer = () => {
     return () => clearInterval(cleanupInterval);
   }, []);
   
-
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      transactions.current = transactions.current.filter((t) => now - t < 10000);
+      setTps(transactions.current.length / 10);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
   const toggleEndorsements = () => {
     setShowEndorsements((prev) => !prev);
   };
@@ -319,7 +333,7 @@ const DAGVisualizer = () => {
           {"WebSocket disconnected. Trying to reconnect..."}
         </div>
       )}
-
+     
       {/* Node Info Box */}
       {hoveredNodeData && (
         <div
@@ -441,7 +455,25 @@ const DAGVisualizer = () => {
        </div>
       
       </div>
-    </div>
+  
+      {/* tx count, tps */}
+        <div style={{
+          position: "absolute",
+          top: "10px",
+          left: "10px",
+          backgroundColor: "white",
+          padding: "10px",
+          lineHeight: "1.5",
+          borderRadius: "5px",
+          boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
+          fontSize: "14px",
+        }}>
+          <strong>Transactions:</strong> {txCount}
+          <br />
+          <strong>TPS:</strong> {tps.toFixed(2)}
+        </div>
+      </div>
+
   );
 
 };
