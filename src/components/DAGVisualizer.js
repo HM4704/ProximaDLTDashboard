@@ -44,6 +44,7 @@ const DAGVisualizer = () => {
   const [txCount, setTxCount] = useState(0);
   const [tps, setTps] = useState(0);
   const transactions = useRef([]);
+  const [isConnected, setIsConnected] = useState(false);
   let latestSlot = useRef(0);
 
   useEffect(() => {
@@ -145,6 +146,7 @@ const DAGVisualizer = () => {
     ws.current.onopen = () => {
       console.log("WebSocket connected");
       setWsError(false); // Clear error if connected
+      setIsConnected(true);
     };
 
     ws.current.onerror = () => {
@@ -154,6 +156,7 @@ const DAGVisualizer = () => {
 
     ws.current.onclose = () => {
       setWsError(true);
+      setIsConnected(false);      
       console.log("WebSocket closed");
       setTimeout(() => {
         if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
@@ -301,6 +304,27 @@ const DAGVisualizer = () => {
   const toggleEndorsements = () => {
     setShowEndorsements((prev) => !prev);
   };
+
+  // cleanup unlinked nodes after ws connect
+  useEffect(() => {
+    if (isConnected) {
+      const timeout = setTimeout(() => {
+
+        nodeTimestamps.current.forEach((timestamp, nodeId) => {
+          const node = graph.current.getNode(nodeId);
+          if (node && (!graph.current.getLinks(nodeId) || graph.current.getLinks(nodeId).length === 0)) {
+            // Remove nodes without links
+            graph.current.removeNode(nodeId);
+            nodeTimestamps.current.delete(nodeId);
+          }
+        });
+
+        console.log("Removed isolated nodes after 5 seconds");
+      }, 5000);
+  
+      return () => clearTimeout(timeout); // Cleanup if component unmounts
+    }
+  }, [isConnected]);
 
   const togglePause = () => {
     setIsPaused((prev) => !prev);
