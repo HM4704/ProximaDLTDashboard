@@ -290,6 +290,10 @@ const DAGVisualizer = () => {
 
   const togglePause = () => {
     setIsPaused((prev) => !prev);
+    if (!isPaused) {
+      graph.current.clear();
+      nodeTimestamps.current.clear();
+    }
   };
 
   return (
