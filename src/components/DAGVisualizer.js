@@ -327,11 +327,20 @@ const DAGVisualizer = () => {
   }, [isConnected]);
 
   const togglePause = () => {
-    setIsPaused((prev) => !prev);
-    if (!isPaused) {
-      graph.current.clear();
-      nodeTimestamps.current.clear();
-    }
+    setIsPaused((prev) => {
+      if (!prev) {
+        // Pausing: Stop the renderer but keep the graph data
+        renderer.current.pause();
+        //ws.current.close();
+        //ws.current = null;
+      } else {
+        // Resuming: Restart the renderer
+        renderer.current.resume();
+        graph.current.clear();
+        nodeTimestamps.current.clear();
+      }
+      return !prev;
+    });      
   };
 
   return (
