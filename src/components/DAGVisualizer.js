@@ -33,7 +33,8 @@ const DAGVisualizer = () => {
   const graph = useRef(Viva.Graph.graph());
   const renderer = useRef(null);
   const layout = useRef(null);
-  const ws = useRef(null);
+  //const ws = useRef(null);
+  const eventSource = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showEndorsements, setShowEndorsements] = useState(false);
   const [wsError, setWsError] = useState(false); // Store WebSocket errors
@@ -136,41 +137,54 @@ const DAGVisualizer = () => {
   useEffect(() => {
     if (!isInitialized) return;
 
-    if (ws.current) {
-      ws.current.close();
-      ws.current = null;
+    if (eventSource.current) {
+      eventSource.current.close();
+      eventSource.current = null;
     }
 
-    ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
 
-    ws.current.onopen = () => {
-      console.log("WebSocket connected");
-      setWsError(false); // Clear error if connected
-      setIsConnected(true);
+    // Basic SSE connection
+    eventSource.current = new EventSource(`http://${config.baseUrl}/events`);
+
+    // eventSource.current.addEventListener("/wsapi/v1/dag_vertex_stream", (event) => {
+    //   console.log("Received message:", event.data);
+    // });
+  
+    eventSource.current.onclose = () => {
+       //setWsError(true);
+       setIsConnected(false);      
+       console.log("SSE closed");
+    }
+
+    // Handle connection open
+    eventSource.current.onopen = () => {
+        console.log('SSE opened!');
+        setWsError(false); // Clear error if connected
+        setIsConnected(true);
     };
 
-    ws.current.onerror = () => {
-      setWsError(true);
-      console.log("WebSocket error");
+    // Handle errors
+    eventSource.current.onerror = (error) => {
+        console.log('Error occurred:', error);
+        setWsError(true); // Clear error if connected
+        setIsConnected(false);
+        eventSource.current.close(); // Close to prevent spam requests
     };
 
-    ws.current.onclose = () => {
-      setWsError(true);
-      setIsConnected(false);      
-      console.log("WebSocket closed");
-      setTimeout(() => {
-        if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-          ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
-        }
-      }, 3000); // Attempt reconnect after 3 seconds
-    };
+    // To close connection when needed
+    function closeConnection() {
+        eventSource.close();
+    }
 
-    ws.current.onmessage = (event) => {
+    eventSource.current.addEventListener("/wsapi/v1/dag_vertex_stream", (event) => {
+    //  eventSource.current.onmessage = (event) => {
+//      ws.current.onmessage = (event) => {
 
       if (isPaused) return; // Ignore new updates when paused
+      //console.log("Received Message: " + event.data.toString());
 
       const newData = JSON.parse(event.data);
-      //console.log("Received Message: " + event.data.toString());
+      console.log("Received Message: " + event.data.toString());
       if (wsError === true) {
         setWsError(false);
       }
@@ -183,6 +197,7 @@ const DAGVisualizer = () => {
           i: newData.i,
           seqid: newData.seqid,
           seqidx: newData.seqidx,
+          stemidx: newData.stemidx,
           in: newData.in,
           endorse: newData.endorse,          
           type: newData.stemidx !== undefined ? "branch" : newData.seqid !== undefined ? "sequencer" : "regular",
@@ -193,6 +208,12 @@ const DAGVisualizer = () => {
         nodeTimestamps.current.set(newData.id, latestSlot.current);        
         transactions.current.push(Date.now());        
         setTxCount((prev) => prev + 1);
+        if (newData.stemidx !== undefined) {
+          if (!graph.current.getNode(newData.in[newData.stemidx])) {
+            console.log("***** stemidx node not found id=", newData.in[newData.stemidx])
+          }
+
+        }
       }
 
       let idx = 0;
@@ -250,9 +271,11 @@ const DAGVisualizer = () => {
           }
         });
       }
-    };
+    });
 
-    return () => ws.current && ws.current.close();
+    //return () => ws.current && ws.current.close();
+    //return () => eventSource.current && eventSource.current.close();
+    return () => eventSource.current?.close();
   }, [isInitialized, wsError, isPaused]);
    
 
@@ -391,6 +414,8 @@ const DAGVisualizer = () => {
           <strong>seqid:</strong> {hoveredNodeData.seqid}
           <br />
           <strong>seqidx:</strong> {hoveredNodeData.seqidx}
+          <br />
+          <strong>stemidx:</strong> {hoveredNodeData.stemidx}
           <br />
           <strong>in:</strong> {hoveredNodeData.in?.join(", ")}
           <br />
