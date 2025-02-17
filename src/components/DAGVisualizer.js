@@ -149,15 +149,16 @@ const DAGVisualizer = () => {
       setIsConnected(true);
     };
 
-    ws.current.onerror = () => {
+    ws.current.onerror = (event) => {      
       setWsError(true);
-      console.log("WebSocket error");
+      console.error("WebSocket error:", event);
     };
 
-    ws.current.onclose = () => {
+    ws.current.onclose = (event) => {
       setWsError(true);
       setIsConnected(false);      
-      console.log("WebSocket closed");
+      console.warn(`WebSocket closed: Code=${event.code}, Reason=${event.reason}, WasClean=${event.wasClean}`);
+    
       setTimeout(() => {
         if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
           ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
@@ -183,6 +184,7 @@ const DAGVisualizer = () => {
           i: newData.i,
           seqid: newData.seqid,
           seqidx: newData.seqidx,
+          stemidx: newData.stemidx,
           in: newData.in,
           endorse: newData.endorse,          
           type: newData.stemidx !== undefined ? "branch" : newData.seqid !== undefined ? "sequencer" : "regular",
@@ -252,7 +254,7 @@ const DAGVisualizer = () => {
       }
     };
 
-    return () => ws.current && ws.current.close();
+    return () => ws.current; // && ws.current.close();
   }, [isInitialized, wsError, isPaused]);
    
 
@@ -392,6 +394,8 @@ const DAGVisualizer = () => {
           <br />
           <strong>seqidx:</strong> {hoveredNodeData.seqidx}
           <br />
+          <strong>stemidx:</strong> {hoveredNodeData.stemidx}
+          <br />
           <strong>in:</strong> {hoveredNodeData.in?.join(", ")}
           <br />
           <strong>endorse:</strong> {hoveredNodeData.endorse?.join(", ")}
@@ -411,7 +415,7 @@ const DAGVisualizer = () => {
           boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
         
         }}>
-        <button onClick={togglePause}>{isPaused ? "Resume DAG" : "Pause DAG"}</button>
+        <button onClick={togglePause}>{isPaused ? "Restart DAG" : "Pause DAG"}</button>
       </div>
 
       {/* Endorsements Toggle Checkbox */}
