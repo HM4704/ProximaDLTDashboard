@@ -67,6 +67,13 @@ function NodeDataTable() {
     const unkownVal = '???';
 
     useEffect(() => {
+        let nodeList = [config.baseUrl];
+        getNodeList(config.baseUrl, nodeList).then(updatedList => {
+            updatedList.forEach((ip) => {
+                fetchNodeInfo(ip);
+                fetchSyncInfo(ip);
+            });
+        });
 
         const intervalId = setInterval(() => {
             let nodeList = [config.baseUrl];

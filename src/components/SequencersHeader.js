@@ -7,7 +7,7 @@ const Header = () => {
       <th>Name</th>
       <th>ID</th>
       <th>On Chain Balance</th>
-      <th>Inflation</th>
+      <th>last active</th>
       </tr>
     </thead>
   );

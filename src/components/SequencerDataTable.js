@@ -37,86 +37,192 @@ function extractInflationValue(constraints) {
     
     return "";
 }
+/* eslint-env es2020 */
+
+function identityDataFromBytes(hexString) {
+    const buf = Buffer.from(hexString, "hex"); // Convert hex string to byte array
+    const view = new DataView(buf.buffer);
+    let offset = 0;
+
+    function readUint16() {
+        const value = view.getUint16(offset, false); // Big-endian
+        offset += 2;
+        return value;
+    }
+
+    function readUint32() {
+        const value = view.getUint32(offset, false); // Big-endian
+        offset += 4;
+        return value;
+    }
+
+    function readUint64() {
+        const high = view.getUint32(offset, false); // High 32 bits
+        const low = view.getUint32(offset + 4, false); // Low 32 bits
+        offset += 8;
+        return (BigInt(high) << 32n) | BigInt(low);
+    }
+
+    function readByte() {
+        return view.getUint8(offset++);
+    }
+
+    function readBytes(length) {
+        const slice = buf.slice(offset, offset + length);
+        offset += length;
+        return slice;
+    }
+
+    const descriptionSize = readUint16();
+    const description = buf.toString("utf-8", offset, offset + descriptionSize);
+    offset += descriptionSize;
+
+    return {
+        description,
+        genesisTimeUnix: readUint32(),
+        initialSupply: readUint64(),
+        genesisControllerPublicKey: readBytes(32), // ED25519 key (32 bytes)
+        tickDuration: readUint64(),
+        slotInflationBase: readUint64(),
+        linearInflationSlots: readUint64(),
+        branchInflationBonusBase: readUint64(),
+        vbCost: readUint64(),
+        transactionPace: readByte(),
+        transactionPaceSequencer: readByte(),
+        minimumAmountOnSequencer: readUint64(),
+        maxNumberOfEndorsements: readUint64(),
+        preBranchConsolidationTicks: readByte(),
+        postBranchConsolidationTicks: readByte(),
+    };
+}
+
+function hexToBytes(hex) {
+    if (hex.length % 2 !== 0) throw new Error("Invalid hex string length");
+    return new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+}
+
+function getSlotFromSequencerOutputID(outputIDHex) {
+    const TimeByteLength = 8;
+    const TransactionIDShortLength = 27;
+    const TransactionIDLength = TimeByteLength + TransactionIDShortLength;
+    const ExpectedOutputIDLength = 32 + 1; // Should be 36 bytes
+    const SequencerTxFlagHigherByte = 0b10000000;
+
+    // Decode hex string to bytes
+    const bytes = hexToBytes(outputIDHex);
+    console.log(`Decoded OutputID Length: ${bytes.length}`);
+
+    if (bytes.length !== ExpectedOutputIDLength) {
+        throw new Error(`Invalid OutputID length: expected ${ExpectedOutputIDLength}, got ${bytes.length}`);
+    }
+
+    // Extract Transaction ID
+    const transactionID = bytes.slice(0, TransactionIDLength);
+
+    // Extract timestamp
+    const timestamp = transactionID.slice(0, TimeByteLength);
+
+    // Mask out the highest bit of the first byte
+    timestamp[0] &= ~SequencerTxFlagHigherByte;
+
+    // Convert first 4 bytes to a slot (big-endian)
+    const slot = (timestamp[0] << 24) | (timestamp[1] << 16) | (timestamp[2] << 8) | timestamp[3];
+
+    return slot;
+}
 
 function SequencerDataTable() {
     const [sequencerData, setSequencerData] = useState([]);
+    const [identityData, setIdentityData] = useState(null);
+    const [syncInf, setSyncInfo] = useState(null);
+
 
     useEffect(() => {
+        // Fetch immediately when the component mounts
+        fetchSyncInfo(config.baseUrl).then((latestSyncInf) => {
+            fetchSequencerStats(config.baseUrl, latestSyncInf);
+        });
+        
         const intervalId = setInterval(() => {
-            fetchSequencerStats(config.baseUrl);
+            fetchSyncInfo(config.baseUrl).then((latestSyncInf) => {
+                fetchSequencerStats(config.baseUrl, latestSyncInf);
+            });
         }, 5000);
-
+    
         return () => clearInterval(intervalId);
     }, []);
 
-    const fetchSequencerStats = async (baseUrl) => {
-        const allChainsUrl = `http://${baseUrl}/api/v1/get_all_chains`;
-        const parseOutputDataUrl = `http://${baseUrl}/txapi/v1/parse_output_data?output_data=`;
-    
+    useEffect(() => {
+        fetchLedgerIdentityData(config.baseUrl);
+    }, []);
+
+    const fetchLedgerIdentityData = async (baseUrl) => {
+        const getLedgerIdUrl = `http://${baseUrl}/api/v1/get_ledger_id`;
+
         try {
-            const chainsResponse = await fetch(allChainsUrl);
-            if (!chainsResponse.ok) throw new Error('Failed to fetch chains data');
-            const chainsData = await chainsResponse.json();
-    
-            setSequencerData((prevSequencerData) => {
-                const updatedSequencerData = [...prevSequencerData];
-    
-                for (const [chainId, chainInfo] of Object.entries(chainsData.chains)) {
-                    const existingIndex = updatedSequencerData.findIndex((item) => item.chainId === chainId);
-    
-                    // Update or add basic chain info
-                    if (existingIndex !== -1) {
-                        updatedSequencerData[existingIndex] = {
-                            ...updatedSequencerData[existingIndex],
-                            data: chainInfo.data,
-                        };
-                    } else {
-                        updatedSequencerData.push({
-                            chainId,
-                            data: chainInfo.data,
-                        });
-                    }
-                }
-                return updatedSequencerData;
-            });
-    
-            // Fetch and filter parsed data
-            const updatedDataPromises = Object.entries(chainsData.chains).map(async ([chainId, chainInfo]) => {
-                const parseResponse = await fetch(parseOutputDataUrl + encodeURIComponent(chainInfo.data));
-                if (!parseResponse.ok) throw new Error(`Failed to parse data for chain: ${chainId}`);
-                const parsedData = await parseResponse.json();
-    
-                // Only include data if constraints contain "sequencer"
-                if (parsedData.constraints.some((constraint) => constraint.includes("sequencer"))) {
-                    return {
-                        chainId,
-                        name: extractOrConstraint(parsedData.constraints),
-                        onChainBalance: parsedData.amount,
-                        id: parsedData.chain_id,
-                        inflation: extractInflationValue(parsedData.constraints),
-                    };
-                }
-                return null; // Skip chains without "sequencer" constraint
-            });
-    
-            const parsedResults = (await Promise.all(updatedDataPromises)).filter(Boolean); // Remove nulls
-    
-            // Update state with filtered results
-            setSequencerData((prevSequencerData) =>
-                prevSequencerData.map((chainData) => {
-                    const parsed = parsedResults.find((parsed) => parsed.chainId === chainData.chainId);
-                    return parsed ? { ...chainData, ...parsed } : chainData;
-                }).concat(
-                    parsedResults.filter(
-                        (parsed) => !prevSequencerData.some((chainData) => chainData.chainId === parsed.chainId)
-                    )
-                )
-            );
+            const ledgerIdResponse = await fetch(getLedgerIdUrl);
+            if (!ledgerIdResponse.ok) throw new Error('Failed to fetch ledger data');
+            const ledgerIdData = await ledgerIdResponse.json();
+            const ledgerIdBytes = new Uint8Array(ledgerIdData.ledger_id_bytes); // Convert to Uint8Array
+            setIdentityData(identityDataFromBytes(ledgerIdBytes));
+
         } catch (error) {
-            console.error('Error fetching sequencer stats:', error.message);
+            console.error('Error fetching ledger identity data:', error.message);
         }
     };
-        
+
+    const fetchSyncInfo = async (baseUrl) => {
+        const getSyncInfoUrl = `http://${baseUrl}/api/v1/sync_info`;
+
+        try {
+            const syncInfoResponse = await fetch(getSyncInfoUrl);
+            if (!syncInfoResponse.ok) throw new Error('Failed to fetch sync info');
+            const syncInfo = await syncInfoResponse.json();
+            const updatedData = {
+                synced: syncInfo.synced,
+                currentSlot: syncInfo.current_slot,
+            };
+
+            setSyncInfo(updatedData);
+            return updatedData; // Return the latest sync info
+        } catch (error) {
+            console.error('Error fetching ledger identity data:', error.message);
+        }
+    };
+
+    const fetchSequencerStats = async (baseUrl, syncInf) => {
+        const url = `http://${baseUrl}/api/v1/get_delegations_by_sequencer`;
+    
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Failed to fetch sequencer data");
+    
+            const data = await response.json();
+            const sequencers = data.sequencers;
+    
+            const currentSlot = syncInf?.currentSlot ?? 0; // Ensure syncInf is not null
+    
+            const formattedData = Object.entries(sequencers).map(([sequencerId, details]) => ({
+                sequencerId,
+                seqOutputId: details.seq_output_id,
+                name: details.seq_name,
+                balance: BigInt(details.balance).toString(),
+                lastActive: (currentSlot - getSlotFromSequencerOutputID(details.seq_output_id)).toString(),
+                delegations: Object.entries(details.delegations).map(([delegatorId, delegation]) => ({
+                    delegatorId,
+                    amount: BigInt(delegation.amount),
+                    sinceSlot: delegation.since_slot,
+                    startAmount: BigInt(delegation.start_amount),
+                })),
+            }));
+    
+            setSequencerData(formattedData);
+        } catch (error) {
+            console.error("Error fetching sequencer stats:", error.message);
+        }
+    };
+     
+    
     return (
         <div className="NodeDataTable">
             <ListView data={sequencerData} />
