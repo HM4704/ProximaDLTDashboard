@@ -33,7 +33,15 @@ function extractIPAndPort(input) {
             return `${ip}:800${port}`;  // Returning as "ip:port"
         }
     } else {
-      throw new Error("Invalid format");
+        const regexIP = /\/ip4\/([0-9.]+)\//;
+        const match = input.match(regexIP);
+        if (match) {
+            const ip = match[1];  // Extracted IP
+            // just try default port
+            return `${ip}:8000`;
+        } else {
+            throw new Error("Invalid format");
+        }        
     }
 }
 

@@ -38,9 +38,8 @@ function extractInflationValue(constraints) {
     return "";
 }
 /* eslint-env es2020 */
-
 function identityDataFromBytes(hexString) {
-    const buf = Buffer.from(hexString, "hex"); // Convert hex string to byte array
+    const buf = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16))); // Convert hex to Uint8Array
     const view = new DataView(buf.buffer);
     let offset = 0;
 
@@ -74,7 +73,7 @@ function identityDataFromBytes(hexString) {
     }
 
     const descriptionSize = readUint16();
-    const description = buf.toString("utf-8", offset, offset + descriptionSize);
+    const description = new TextDecoder().decode(buf.slice(offset, offset + descriptionSize));
     offset += descriptionSize;
 
     return {
@@ -156,21 +155,23 @@ function SequencerDataTable() {
         fetchLedgerIdentityData(config.baseUrl);
     }, []);
 
+
     const fetchLedgerIdentityData = async (baseUrl) => {
         const getLedgerIdUrl = `http://${baseUrl}/api/v1/get_ledger_id`;
-
+    
         try {
             const ledgerIdResponse = await fetch(getLedgerIdUrl);
-            if (!ledgerIdResponse.ok) throw new Error('Failed to fetch ledger data');
+            if (!ledgerIdResponse.ok) throw new Error("Failed to fetch ledger data");
+            
             const ledgerIdData = await ledgerIdResponse.json();
-            const ledgerIdBytes = new Uint8Array(ledgerIdData.ledger_id_bytes); // Convert to Uint8Array
-            setIdentityData(identityDataFromBytes(ledgerIdBytes));
-
+            const ledgerIdHex = ledgerIdData.ledger_id_bytes; // Assuming this is a hex string
+    
+            setIdentityData(identityDataFromBytes(ledgerIdHex));
         } catch (error) {
-            console.error('Error fetching ledger identity data:', error.message);
+            console.error("Error fetching ledger identity data:", error.message);
         }
     };
-
+    
     const fetchSyncInfo = async (baseUrl) => {
         const getSyncInfoUrl = `http://${baseUrl}/api/v1/sync_info`;
 
