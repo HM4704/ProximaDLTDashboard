@@ -109,7 +109,6 @@ function getSlotFromSequencerOutputID(outputIDHex) {
 
     // Decode hex string to bytes
     const bytes = hexToBytes(outputIDHex);
-    console.log(`Decoded OutputID Length: ${bytes.length}`);
 
     if (bytes.length !== ExpectedOutputIDLength) {
         throw new Error(`Invalid OutputID length: expected ${ExpectedOutputIDLength}, got ${bytes.length}`);
@@ -157,8 +156,10 @@ function SequencerDataTable() {
 
 
     const fetchLedgerIdentityData = async (baseUrl) => {
-        const getLedgerIdUrl = `http://${baseUrl}/api/v1/get_ledger_id`;
-    
+        //const getLedgerIdUrl = `http://${baseUrl}/api/v1/get_ledger_id`;
+        //const getLedgerIdUrl = `https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/get_ledger_id`;
+        const getLedgerIdUrl = `https://moosi.mooo.com/api/proxy/api/proxy/api/v1/get_ledger_id`;
+            
         try {
             const ledgerIdResponse = await fetch(getLedgerIdUrl);
             if (!ledgerIdResponse.ok) throw new Error("Failed to fetch ledger data");
@@ -173,7 +174,9 @@ function SequencerDataTable() {
     };
     
     const fetchSyncInfo = async (baseUrl) => {
-        const getSyncInfoUrl = `http://${baseUrl}/api/v1/sync_info`;
+        //const getSyncInfoUrl = `http://${baseUrl}/api/v1/sync_info`;
+        //const getSyncInfoUrl = `https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/sync_info`;
+        const getSyncInfoUrl = `https://moosi.mooo.com/api/proxy/api/proxy/api/v1/sync_info`;
 
         try {
             const syncInfoResponse = await fetch(getSyncInfoUrl);
@@ -192,8 +195,9 @@ function SequencerDataTable() {
     };
 
     const fetchSequencerStats = async (baseUrl, syncInf) => {
-        const url = `http://${baseUrl}/api/v1/get_delegations_by_sequencer`;
-    
+        //const url = `http://${baseUrl}/api/v1/get_delegations_by_sequencer`;
+        // const url = `https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/get_delegations_by_sequencer`;
+        const url = `https://moosi.mooo.com/api/proxy/api/proxy/api/v1/get_delegations_by_sequencer`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error("Failed to fetch sequencer data");

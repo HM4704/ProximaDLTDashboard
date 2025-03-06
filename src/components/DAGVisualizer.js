@@ -141,7 +141,8 @@ const DAGVisualizer = () => {
       ws.current = null;
     }
 
-    ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
+    //ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
+    ws.current = new WebSocket(`wss://moosi.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
 
     ws.current.onopen = () => {
       console.log("WebSocket connected");
@@ -254,7 +255,15 @@ const DAGVisualizer = () => {
       }
     };
 
-    return () => ws.current; // && ws.current.close();
+    // Cleanup WebSocket on unmount
+    return () => {
+          if (ws.current) {
+              ws.current.close();
+              ws.current = null;
+              console.log("WebSocket closed on unmount");
+          }
+     };
+//    return () => ws.current; // && ws.current.close();
   }, [isInitialized, wsError, isPaused]);
    
 

@@ -47,7 +47,12 @@ function extractIPAndPort(input) {
 
 async function getNodeList(ip, nodeList) {
     try {
-        const response = await fetch(`http://${ip}/api/v1/peers_info`);
+        //const response = await fetch(`http://${ip}/api/v1/peers_info`);
+        //const response = await fetch(`https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/peers_info`);
+        const response = await fetch("https://moosi.mooo.com/api/proxy/api/v1/peers_info", {
+            headers: { "X-Target-URL": `http://${ip}` }
+        })
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -97,7 +102,11 @@ function NodeDataTable() {
     }, []); // Empty dependency array means this effect runs only once on mount
 
     const fetchNodeInfo = (ip) => {
-        fetch(`http://${ip}/api/v1/node_info`)
+        //fetch(`http://${ip}/api/v1/node_info`)
+        //fetch(`https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/node_info`)
+        fetch("https://moosi.mooo.com/api/proxy/api/v1/node_info", {
+            headers: { "X-Target-URL": `http://${ip}` }
+        })
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -127,7 +136,11 @@ function NodeDataTable() {
     };
 
     const fetchSyncInfo = (ip) => {
-        fetch(`http://${ip}/api/v1/sync_info`)
+        //fetch(`http://${ip}/api/v1/sync_info`)
+        //fetch(`https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/sync_info`)
+        fetch("https://moosi.mooo.com/api/proxy/api/v1/sync_info", {
+            headers: { "X-Target-URL": `http://${ip}` }
+        })
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
