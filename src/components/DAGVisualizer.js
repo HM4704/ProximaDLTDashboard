@@ -47,6 +47,21 @@ const DAGVisualizer = () => {
   const [isConnected, setIsConnected] = useState(false);
   let latestSlot = useRef(0);
 
+  const zoomOutMultipleTimes = (times, delay) => {
+    let count = 0;
+    
+    const interval = setInterval(() => {
+      if (renderer.current && typeof renderer.current.zoomOut === "function") {
+        renderer.current.zoomOut(true);
+      }
+      
+      count++;
+      if (count >= times) {
+        clearInterval(interval); // Stop after 10 times
+      }
+    }, delay);
+  };
+
   useEffect(() => {
     showEndorsementsRef.current = showEndorsements;
   }, [showEndorsements]);
@@ -102,6 +117,8 @@ const DAGVisualizer = () => {
     renderer.current.run();
     setIsInitialized(true);
 
+    zoomOutMultipleTimes(13, 80);
+
     // Mouse events for showing node info
     const events = Viva.Graph.webglInputEvents(graphics, graph.current);
     events.mouseEnter((node) => {
@@ -142,7 +159,8 @@ const DAGVisualizer = () => {
     }
 
     //ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
-    ws.current = new WebSocket(`wss://moosi.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
+    //ws.current = new WebSocket(`wss://moosi.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
+    ws.current = new WebSocket(`wss://proximadlt.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
 
     ws.current.onopen = () => {
       console.log("WebSocket connected");
@@ -160,11 +178,11 @@ const DAGVisualizer = () => {
       setIsConnected(false);      
       console.warn(`WebSocket closed: Code=${event.code}, Reason=${event.reason}, WasClean=${event.wasClean}`);
     
-      setTimeout(() => {
-        if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-          ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
-        }
-      }, 3000); // Attempt reconnect after 3 seconds
+      // setTimeout(() => {
+      //   if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
+      //     ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
+      //   }
+      // }, 3000); // Attempt reconnect after 3 seconds
     };
 
     ws.current.onmessage = (event) => {

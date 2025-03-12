@@ -157,8 +157,7 @@ function SequencerDataTable() {
 
     const fetchLedgerIdentityData = async (baseUrl) => {
         //const getLedgerIdUrl = `http://${baseUrl}/api/v1/get_ledger_id`;
-        //const getLedgerIdUrl = `https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/get_ledger_id`;
-        const getLedgerIdUrl = `https://moosi.mooo.com/api/proxy/api/proxy/api/v1/get_ledger_id`;
+        const getLedgerIdUrl = `https://proximadlt.mooo.com/api/proxy/api/proxy/api/v1/get_ledger_id`;
             
         try {
             const ledgerIdResponse = await fetch(getLedgerIdUrl);
@@ -175,8 +174,7 @@ function SequencerDataTable() {
     
     const fetchSyncInfo = async (baseUrl) => {
         //const getSyncInfoUrl = `http://${baseUrl}/api/v1/sync_info`;
-        //const getSyncInfoUrl = `https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/sync_info`;
-        const getSyncInfoUrl = `https://moosi.mooo.com/api/proxy/api/proxy/api/v1/sync_info`;
+        const getSyncInfoUrl = `https://proximadlt.mooo.com/api/proxy/api/proxy/api/v1/sync_info`;
 
         try {
             const syncInfoResponse = await fetch(getSyncInfoUrl);
@@ -196,8 +194,7 @@ function SequencerDataTable() {
 
     const fetchSequencerStats = async (baseUrl, syncInf) => {
         //const url = `http://${baseUrl}/api/v1/get_delegations_by_sequencer`;
-        // const url = `https://api-proxy-server-st7z.onrender.com/api/proxy/api/v1/get_delegations_by_sequencer`;
-        const url = `https://moosi.mooo.com/api/proxy/api/proxy/api/v1/get_delegations_by_sequencer`;
+        const url = `https://proximadlt.mooo.com/api/proxy/api/proxy/api/v1/get_delegations_by_sequencer`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error("Failed to fetch sequencer data");
