@@ -37,7 +37,7 @@ function App() {
                         <Route path="/visualizer" element={<Visualizer />} />
                     </Routes>
             </Router>
-            <div style={{ position: 'absolute', top: '30px', right: '20px', zIndex: 1000 }}>
+{/*             <div style={{ position: 'absolute', top: '30px', right: '20px', zIndex: 1000 }}>
                 <label htmlFor="baseUrl" style={{ marginRight: '10px', fontSize: '13px' }}>Query URL:</label>
                 <input
                     type="text"
@@ -47,7 +47,7 @@ function App() {
                     style={{ padding: '5px', fontSize: '14px', width: '200px' }}
                 />
             </div>
-        </div>
+ */}        </div>
 );
 }
 
