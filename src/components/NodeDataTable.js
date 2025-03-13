@@ -1,15 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ListView from './NodesListView';
-
-function registerAddress(array, stringToAdd) {
-    if (stringToAdd.length === 0 || stringToAdd.includes('127.0.0.1')) {
-        return array;
-    }
-    if (!array.includes(stringToAdd)) {
-        array.push(stringToAdd);
-    }
-    return array;
-}
 
 async function fetchPeers(ip = null) {
     try {
@@ -53,8 +43,7 @@ async function fetchWithTimeout(url, headers, timeoutMs = 3000) {
 async function fetchNodeDetails(ip) {
     try {
         const headers = { "X-Target-URL": `http://${ip}` };
-        
-        // Fetch node details with a timeout
+
         const [nodeInfo, syncInfo] = await Promise.all([
             fetchWithTimeout("https://proximadlt.mooo.com/api/proxy/api/v1/node_info", headers),
             fetchWithTimeout("https://proximadlt.mooo.com/api/proxy/api/v1/sync_info", headers)
@@ -88,30 +77,30 @@ function sortNodes(nodes) {
 
 function NodeDataTable() {
     const [nodes, setNodes] = useState([]);
+    const nodesMapRef = useRef(new Map());
 
     useEffect(() => {
         async function updateNodes() {
             let foundNodes = await fetchPeers();
             foundNodes = [...new Set(foundNodes)].slice(0, 50); // Limit initial nodes for performance
 
-            const validNodes = [];
             for (const node of foundNodes) {
                 const moreNodes = await fetchPeers(node);
-                validNodes.push(...moreNodes.filter(ip => ip !== null)); // Filter out null results quickly
+                foundNodes = [...new Set([...foundNodes, ...moreNodes])];
             }
 
-            // Fetch node details incrementally (faster UI updates)
-            const nodeDetails = [];
-            for (const ip of [...new Set(validNodes)]) {
-                fetchNodeDetails(ip).then(detail => {
-                    if (detail) {
-                        nodeDetails.push(detail);
-                        setNodes(sortNodes([...nodeDetails])); // Update UI as soon as data arrives
-                    }
-                });
+            const nodeDetails = await Promise.all(foundNodes.map(fetchNodeDetails));
+
+            const newNodesMap = new Map(nodesMapRef.current);
+
+            for (const node of nodeDetails) {
+                newNodesMap.set(node.ip, node);
             }
+
+            nodesMapRef.current = newNodesMap;
+            setNodes(sortNodes([...newNodesMap.values()]));
         }
-        
+
         updateNodes();
         const intervalId = setInterval(updateNodes, 5000);
         return () => clearInterval(intervalId);
