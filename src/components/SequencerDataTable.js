@@ -193,8 +193,7 @@ function SequencerDataTable() {
     };
 
     const fetchSequencerStats = async (baseUrl, syncInf) => {
-        //const url = `http://${baseUrl}/api/v1/get_delegations_by_sequencer`;
-        const url = `https://proximadlt.mooo.com/api/proxy/api/proxy/api/v1/get_delegations_by_sequencer`;
+        const url = `https://${baseUrl}/api/proxy/api/proxy/api/v1/get_delegations_by_sequencer`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error("Failed to fetch sequencer data");

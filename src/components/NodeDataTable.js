@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ListView from './NodesListView';
+import config from './../config';  // Import the configuration
 
 async function fetchPeers(ip = null) {
     try {
-        const url = "https://proximadlt.mooo.com/api/proxy/api/v1/peers_info";
+        const url = `https://${config.baseUrl}/api/proxy/api/v1/peers_info`;
         const headers = ip ? { "X-Target-URL": `http://${ip}` } : {};
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 3000); // Set timeout for fast failures
@@ -45,8 +46,8 @@ async function fetchNodeDetails(ip) {
         const headers = { "X-Target-URL": `http://${ip}` };
 
         const [nodeInfo, syncInfo] = await Promise.all([
-            fetchWithTimeout("https://proximadlt.mooo.com/api/proxy/api/v1/node_info", headers),
-            fetchWithTimeout("https://proximadlt.mooo.com/api/proxy/api/v1/sync_info", headers)
+            fetchWithTimeout(`https://${config.baseUrl}/api/proxy/api/v1/node_info`, headers),
+            fetchWithTimeout(`https://${config.baseUrl}/api/proxy/api/v1/sync_info`, headers)
         ]);
 
         return {

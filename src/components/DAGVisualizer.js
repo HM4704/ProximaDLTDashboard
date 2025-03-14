@@ -37,7 +37,7 @@ const DAGVisualizer = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [showEndorsements, setShowEndorsements] = useState(false);
   const [wsError, setWsError] = useState(false); // Store WebSocket errors
-  const [isPaused, setIsPaused] = useState(false); // DAG display pause state
+  const isPaused = useRef(false); // DAG display pause state
   const [hoveredNodeData, setHoveredNodeData] = useState(null);
   const showEndorsementsRef = useRef(showEndorsements);
   const nodeTimestamps = useRef(new Map());
@@ -117,7 +117,7 @@ const DAGVisualizer = () => {
     renderer.current.run();
     setIsInitialized(true);
 
-    zoomOutMultipleTimes(13, 80);
+    zoomOutMultipleTimes(13, 40);
 
     // Mouse events for showing node info
     const events = Viva.Graph.webglInputEvents(graphics, graph.current);
@@ -159,8 +159,8 @@ const DAGVisualizer = () => {
     }
 
     //ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
-    //ws.current = new WebSocket(`wss://moosi.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
-    ws.current = new WebSocket(`wss://proximadlt.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
+    //ws.current = new WebSocket(`wss://proximadlt.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
+    ws.current = new WebSocket(`wss://${config.baseUrl}/api/proxy/wsapi/v1/dag_vertex_stream`);
 
     ws.current.onopen = () => {
       console.log("WebSocket connected");
@@ -178,16 +178,17 @@ const DAGVisualizer = () => {
       setIsConnected(false);      
       console.warn(`WebSocket closed: Code=${event.code}, Reason=${event.reason}, WasClean=${event.wasClean}`);
     
-      // setTimeout(() => {
-      //   if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-      //     ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
-      //   }
-      // }, 3000); // Attempt reconnect after 3 seconds
+      setTimeout(() => {
+        if ((!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
+          //ws.current = new WebSocket(`wss://proximadlt.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
+          ws.current = new WebSocket(`wss://moosi.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
+        }
+      }, 3000); // Attempt reconnect after 3 seconds
     };
 
     ws.current.onmessage = (event) => {
 
-      if (isPaused) return; // Ignore new updates when paused
+      if (isPaused.current) return; // Ignore new updates when paused
 
       const newData = JSON.parse(event.data);
       //console.log("Received Message: " + event.data.toString());
@@ -282,7 +283,7 @@ const DAGVisualizer = () => {
           }
      };
 //    return () => ws.current; // && ws.current.close();
-  }, [isInitialized, wsError, isPaused]);
+  }, [isInitialized, wsError]);
    
 
   useEffect(() => {
@@ -356,20 +357,19 @@ const DAGVisualizer = () => {
   }, [isConnected]);
 
   const togglePause = () => {
-    setIsPaused((prev) => {
-      if (!prev) {
+    isPaused.current = !isPaused.current;
+      if (isPaused.current) {
         // Pausing: Stop the renderer but keep the graph data
         renderer.current.pause();
-        //ws.current.close();
-        //ws.current = null;
+        // ws.current.close();
+        // ws.current = null;
       } else {
         // Resuming: Restart the renderer
         renderer.current.resume();
         graph.current.clear();
         nodeTimestamps.current.clear();
       }
-      return !prev;
-    });      
+      return !isPaused.current;
   };
 
   return (
@@ -442,7 +442,7 @@ const DAGVisualizer = () => {
           boxShadow: "0px 0px 5px rgba(0, 0, 0, 0.2)",
         
         }}>
-        <button onClick={togglePause}>{isPaused ? "Restart DAG" : "Pause DAG"}</button>
+        <button onClick={togglePause}>{isPaused.current ? "Restart DAG" : "Pause DAG"}</button>
       </div>
 
       {/* Endorsements Toggle Checkbox */}
