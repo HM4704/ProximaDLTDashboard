@@ -1,192 +1,113 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ListView from './NodesListView';
 import config from './../config';  // Import the configuration
 
-function registerAddress(array, stringToAdd) {
-    if (stringToAdd.length === 0 || stringToAdd.includes('127.0.0.1')) {
-        return array;
-    }
+async function fetchPeers(ip = null) {
+    try {
+        const url = `https://${config.baseUrl}/api/proxy/api/v1/peers_info`;
+        const headers = ip ? { "X-Target-URL": `http://${ip}` } : {};
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000); // Set timeout for fast failures
 
-    if (!array.includes(stringToAdd)) {
-        array.push(stringToAdd);
+        const response = await fetch(url, { headers, signal: controller.signal });
+        clearTimeout(timeout);
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        return data.peers.map(peer => peer.multiAddresses.map(extractIPAndPort)).flat();
+    } catch (error) {
+        console.error(`Failed to fetch peers from ${ip || 'root'}:`, error);
+        return [];
     }
-    return array;
 }
 
 function extractIPAndPort(input) {
-    // Regular expression to capture the IP address and port
-    const regex = /\/ip4\/([0-9.]+)\/tcp\/400([0-9])/;
-    const matches = input.match(regex);
-    // /ip4/113.30.191.219/udp/4001/quic-v1
-    const regexQuic = /\/ip4\/([0-9.]+)\/udp\/400([0-9])\/quic-v1/;
-    const matchesQuic = input.match(regexQuic);
-  
-    // Check if the regex found a match
-    if (matches || matchesQuic) {
-        if (matches) {
-            const ip = matches[1];
-            const port = matches[2];
-            return `${ip}:800${port}`;  // Returning as "ip:port"
-        } else {
-            const ip = matchesQuic[1];
-            const port = matchesQuic[2];
-            return `${ip}:800${port}`;  // Returning as "ip:port"
-        }
-    } else {
-      throw new Error("Invalid format");
+    const regex = /\/ip4\/([0-9.]+)\/(tcp|udp)\/400([0-9])/;
+    const match = input.match(regex);
+    return match ? `${match[1]}:800${match[3]}` : null;
+}
+
+// Wrapper function to add a timeout to fetch requests
+async function fetchWithTimeout(url, headers, timeoutMs = 3000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, { headers, signal: controller.signal });
+        clearTimeout(timeout);
+        return response.ok ? await response.json() : null;
+    } catch {
+        return null;
     }
 }
 
-async function getNodeList(ip, nodeList) {
+async function fetchNodeDetails(ip) {
     try {
-        const response = await fetch(`http://${ip}/api/v1/peers_info`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json(); // Ensure you're parsing the JSON response
+        const headers = { "X-Target-URL": `http://${ip}` };
 
-        console.log('Received data:', data);
+        const [nodeInfo, syncInfo] = await Promise.all([
+            fetchWithTimeout(`https://${config.baseUrl}/api/proxy/api/v1/node_info`, headers),
+            fetchWithTimeout(`https://${config.baseUrl}/api/proxy/api/v1/sync_info`, headers)
+        ]);
 
-        // Update the nodeData state with the new data
-        data.peers.forEach(peer => {
-            peer.multiAddresses.forEach(address => {
-                registerAddress(nodeList, extractIPAndPort(address));
-                console.log(`  - ${address}`);
-            });
-        });
-
-        return nodeList; // Return the updated nodeList after processing
+        return {
+            ip,
+            id: nodeInfo ? '...' + nodeInfo.id.substring(20) : '???',
+            numPeers: nodeInfo ? (nodeInfo.num_static_peers + nodeInfo.num_dynamic_alive).toString() : '???',
+            version: nodeInfo ? nodeInfo.version : '???',
+            synced: syncInfo ? (syncInfo.synced ? "Yes" : "No") : '???',
+            slotHC: syncInfo?.lrb_slot && syncInfo?.current_slot
+                ? `${syncInfo.lrb_slot} / ${syncInfo.current_slot}`
+                : '???',
+            sequId: syncInfo?.per_sequencer ? Object.keys(syncInfo.per_sequencer)[0] || '???' : '???'
+        };
     } catch (error) {
-        console.error('Fetch error:', error);
-        return nodeList; // Return the original nodeList in case of error
+        console.error(`Error fetching node details for ${ip}:`, error);
+        return { ip, id: '???', numPeers: '???', version: '???', synced: '???', slotHC: '???', sequId: '???' };
     }
+}
+
+// Sort function: Move unknown IDs to the bottom and sort known IDs alphabetically
+function sortNodes(nodes) {
+    return nodes.sort((a, b) => {
+        if (a.id === '???') return 1;  // Move unknown IDs to the bottom
+        if (b.id === '???') return -1; // Keep known IDs at the top
+        return a.id.localeCompare(b.id); // Alphabetical order
+    });
 }
 
 function NodeDataTable() {
-    const [nodeData, setNodeData] = useState([]);
-    const unkownVal = '???';
+    const [nodes, setNodes] = useState([]);
+    const nodesMapRef = useRef(new Map());
 
     useEffect(() => {
-        let nodeList = [config.baseUrl];
-        getNodeList(config.baseUrl, nodeList).then(updatedList => {
-            updatedList.forEach((ip) => {
-                fetchNodeInfo(ip);
-                fetchSyncInfo(ip);
-            });
-        });
+        async function updateNodes() {
+            let foundNodes = await fetchPeers();
+            foundNodes = [...new Set(foundNodes)].slice(0, 50); // Limit initial nodes for performance
 
-        const intervalId = setInterval(() => {
-            let nodeList = [config.baseUrl];
-            getNodeList(config.baseUrl, nodeList).then(updatedList => {
-                updatedList.forEach((ip) => {
-                    fetchNodeInfo(ip);
-                    fetchSyncInfo(ip);
-                });
-            });
-        }, 5000);
-
-        return () => clearInterval(intervalId);
-    }, []); // Empty dependency array means this effect runs only once on mount
-
-    const fetchNodeInfo = (ip) => {
-        fetch(`http://${ip}/api/v1/node_info`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then((data) => {
-                const newData = {
-                    ip,
-                    id: '...' + data.id.substring(20, data.id.length),
-                    numPeers: (data.num_static_peers + data.num_dynamic_alive).toString(),
-                    //synced: true,
-                    version: data.version,
-                };
-                updateNodeData(newData);
-            })
-            .catch((error) => {
-                console.error('Fetch error:', error);
-                updateNodeData({
-                    ip,
-                    id: unkownVal,
-                    numPeers: unkownVal,
-                    synced: unkownVal,
-                    version: unkownVal,
-                });
-            });
-    };
-
-    const fetchSyncInfo = (ip) => {
-        fetch(`http://${ip}/api/v1/sync_info`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then((data) => {
-                const updatedData = {
-                    ip,
-                    synced: data.synced ? "Yes" : "No",
-                    sequId: unkownVal,
-                    slotHC: unkownVal,
-                };
-                
-                if (data.per_sequencer) {
-                    // Check if per_sequencer is an array
-                    if (Array.isArray(data.per_sequencer)) {
-                        data.per_sequencer.forEach((value, key) => {
-                            updatedData.sequId = key;
-                            updatedData.slotHC = `${value.latest_healthy_slot.toString()} / ${value.latest_committed_slot.toString()}`;
-                        });
-                    } else if (typeof data.per_sequencer === 'object') {
-                        // If it's an object, loop through its keys
-                        for (const [key, value] of Object.entries(data.per_sequencer)) {
-                            updatedData.sequId = key;
-                            updatedData.slotHC = `${value.latest_healthy_slot.toString()} / ${value.latest_committed_slot.toString()}`;
-                        }
-                    } else {
-                        console.error('Unexpected structure for per_sequencer:', data.per_sequencer);
-                    }
-                }
-                if (data.lrb_slot && data.current_slot) {
-                    updatedData.slotHC = `${data.lrb_slot.toString()} / ${data.current_slot.toString()}`;
-                }
-    
-                updateNodeData(updatedData);
-            })
-            .catch((error) => {
-                console.error('Fetch error:', error);
-                updateNodeData({
-                    ip,
-                    synced: unkownVal,
-                    slotHC: unkownVal,
-                    sequId: unkownVal,
-                });
-            });
-    };
-    
-    const updateNodeData = (newEntry) => {
-        setNodeData(prevData => {
-            const index = prevData.findIndex(node => node.ip === newEntry.ip);
-
-            if (index !== -1) {
-                const updatedData = [...prevData];
-                updatedData[index] = { ...updatedData[index], ...newEntry };
-                return updatedData;
-            } else {
-                return [...prevData, newEntry];
+            for (const node of foundNodes) {
+                const moreNodes = await fetchPeers(node);
+                foundNodes = [...new Set([...foundNodes, ...moreNodes])];
             }
-        });
-    };
 
-    return (
-        <div className="NodeDataTable">
-            <ListView data={nodeData} />            
-        </div>
-    );
+            const nodeDetails = await Promise.all(foundNodes.map(fetchNodeDetails));
+
+            const newNodesMap = new Map(nodesMapRef.current);
+
+            for (const node of nodeDetails) {
+                newNodesMap.set(node.ip, node);
+            }
+
+            nodesMapRef.current = newNodesMap;
+            setNodes(sortNodes([...newNodesMap.values()]));
+        }
+
+        updateNodes();
+        const intervalId = setInterval(updateNodes, 5000);
+        return () => clearInterval(intervalId);
+    }, []);
+
+    return <ListView data={nodes} />;
 }
 
 export default NodeDataTable;
