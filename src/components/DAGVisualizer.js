@@ -152,138 +152,147 @@ const DAGVisualizer = () => {
 
   useEffect(() => {
     if (!isInitialized) return;
-
-    if (ws.current) {
-      ws.current.close();
-      ws.current = null;
-    }
-
-    //ws.current = new WebSocket(`ws://${config.baseUrl}/wsapi/v1/dag_vertex_stream`);
-    //ws.current = new WebSocket(`wss://proximadlt.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
-    ws.current = new WebSocket(`wss://${config.baseUrl}/api/proxy/wsapi/v1/dag_vertex_stream`);
-
-    ws.current.onopen = () => {
-      console.log("WebSocket connected");
-      setWsError(false); // Clear error if connected
-      setIsConnected(true);
-    };
-
-    ws.current.onerror = (event) => {      
-      setWsError(true);
-      console.error("WebSocket error:", event);
-    };
-
-    ws.current.onclose = (event) => {
-      setWsError(true);
-      setIsConnected(false);      
-      console.warn(`WebSocket closed: Code=${event.code}, Reason=${event.reason}, WasClean=${event.wasClean}`);
-    
-      setTimeout(() => {
-        if ((!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
-          //ws.current = new WebSocket(`wss://proximadlt.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
-          ws.current = new WebSocket(`wss://moosi.mooo.com/api/proxy/wsapi/v1/dag_vertex_stream`);
-        }
-      }, 3000); // Attempt reconnect after 3 seconds
-    };
-
-    ws.current.onmessage = (event) => {
-
-      if (isPaused.current) return; // Ignore new updates when paused
-
-      const newData = JSON.parse(event.data);
-      //console.log("Received Message: " + event.data.toString());
-      if (wsError === true) {
+  
+    const connectWebSocket = () => {
+      if (ws.current) {
+        ws.current.close();
+        ws.current = null;
+      }
+  
+      console.log("Connecting WebSocket...");
+      ws.current = new WebSocket(`wss://${config.baseUrl}/api/proxy/wsapi/v1/dag_vertex_stream`);
+  
+      ws.current.onopen = () => {
+        console.log("WebSocket connected");
         setWsError(false);
-      }
-
-      if (!graph.current.getNode(newData.id)) {
-        graph.current.addNode(newData.id, {
-          initial: true,
-          id: newData.id,
-          a: newData.a,
-          i: newData.i,
-          seqid: newData.seqid,
-          seqidx: newData.seqidx,
-          stemidx: newData.stemidx,
-          in: newData.in,
-          endorse: newData.endorse,          
-          type: newData.stemidx !== undefined ? "branch" : newData.seqid !== undefined ? "sequencer" : "regular",
-        });
-
-        // Store the timestamp when the node is added
-        latestSlot.current = getSlotForTxId(newData.id);
-        nodeTimestamps.current.set(newData.id, latestSlot.current);        
-        transactions.current.push(Date.now());        
-        setTxCount((prev) => prev + 1);
-      }
-
-      let idx = 0;
-      newData.in.forEach((source) => {
-        // if (!graph.current.getNode(source)) {
-        //   graph.current.addNode(source, { initial: true });
-        // }
-
-      // if it is branch, you find stem edge and color it.
-      // If not and it is seq, you color seq predecessor
-      // Otherwise grey edge
-
-        if (graph.current.getNode(source)) {
-          // only add link if node exists
-          if (!graph.current.getLink(source, newData.id)) {
-            const linkType =
-              newData.stemidx !== undefined && newData.stemidx === idx
-                ? "stempred"
-                : newData.seqid !== undefined && newData.seqidx === idx
-                ? "seqpred"
-                : "input";
-
-            graph.current.addLink(source, newData.id, { type: linkType });
-          }
+        setIsConnected(true);
+      };
+  
+      ws.current.onerror = (event) => {
+        console.error("WebSocket error:", event);
+        setWsError(true);
+      };
+  
+      ws.current.onclose = (event) => {
+        console.warn(`WebSocket closed: Code=${event.code}, Reason=${event.reason}, WasClean=${event.wasClean}`);
+        setIsConnected(false);
+        setWsError(true);
+        if (ws.current) {
+          ws.current.close();
+          ws.current = null;
         }
-        idx++;
-      });
+        
+        if (event.code !== 1000) { // 1000 = normal closure
+          setTimeout(connectWebSocket, 5000); // Attempt reconnect after 5 seconds
+        }
+      };
+  
+      ws.current.onmessage = (event) => {
 
-      if (newData.endorse) {
-        newData.endorse.forEach((source) => {
+        if (isPaused.current) return; // Ignore new updates when paused
+  
+        const newData = JSON.parse(event.data);
+        //console.log("Received Message: " + event.data.toString());
+
+        if (!newData.hasOwnProperty("a")) {
+          if (graph.current.getNode(newData.id)) {
+            console.log("Delete vertex: " + newData.id);
+            graph.current.removeNode(newData.id);
+          }
+          return;
+        }
+  
+        if (!graph.current.getNode(newData.id)) {
+          graph.current.addNode(newData.id, {
+            initial: true,
+            id: newData.id,
+            a: newData.a,
+            i: newData.i,
+            seqid: newData.seqid,
+            seqidx: newData.seqidx,
+            stemidx: newData.stemidx,
+            in: newData.in,
+            endorse: newData.endorse,          
+            type: newData.stemidx !== undefined ? "branch" : newData.seqid !== undefined ? "sequencer" : "regular",
+          });
+  
+          // Store the timestamp when the node is added
+          latestSlot.current = getSlotForTxId(newData.id);
+          nodeTimestamps.current.set(newData.id, latestSlot.current);
+          transactions.current.push(Date.now());
+          setTxCount((prev) => prev + 1);
+        }
+  
+        let idx = 0;
+        newData.in.forEach((source) => {
           // if (!graph.current.getNode(source)) {
           //   graph.current.addNode(source, { initial: true });
           // }
+
+          // if it is branch, you find stem edge and color it.
+          // If not and it is seq, you color seq predecessor
+          // Otherwise grey edge
+
           if (graph.current.getNode(source)) {
             // only add link if node exists
-  
             if (!graph.current.getLink(source, newData.id)) {
-              const color = showEndorsements ? EndorseLinkVisCol : EndorseLinkHidCol;
-              graph.current.addLink(source, newData.id, { type: "endorse", color });
-
-              // Update the new link color
-              setTimeout(() => {
-                const graphics = renderer.current.getGraphics();
-                const link = graph.current.getLink(source, newData.id);
-                if (link) {
-                  const linkUI = graphics.getLinkUI(link.id);
-                  if (linkUI) {
-                    const color = showEndorsementsRef.current ? EndorseLinkVisCol : EndorseLinkHidCol;
-                    linkUI.color = Viva.Graph.View._webglUtil.parseColor(color);
-                    renderer.current.rerender();
-                  }
-                }
-              }, 0);              
+              const linkType =
+                newData.stemidx !== undefined && newData.stemidx === idx
+                  ? "stempred"
+                  : newData.seqid !== undefined && newData.seqidx === idx
+                  ? "seqpred"
+                  : "input";
+  
+              graph.current.addLink(source, newData.id, { type: linkType });
             }
           }
+          idx++;
         });
-      }
+  
+        if (newData.endorse) {
+          newData.endorse.forEach((source) => {
+            // if (!graph.current.getNode(source)) {
+            //   graph.current.addNode(source, { initial: true });
+            // }
+            if (graph.current.getNode(source)) {
+              // only add link if node exists
+  
+              if (!graph.current.getLink(source, newData.id)) {
+                const color = showEndorsements ? EndorseLinkVisCol : EndorseLinkHidCol;
+                graph.current.addLink(source, newData.id, { type: "endorse", color });
+  
+                // Update the new link color
+                setTimeout(() => {
+                  const graphics = renderer.current.getGraphics();
+                  const link = graph.current.getLink(source, newData.id);
+                  if (link) {
+                    const linkUI = graphics.getLinkUI(link.id);
+                    if (linkUI) {
+                      const color = showEndorsementsRef.current ? EndorseLinkVisCol : EndorseLinkHidCol;
+                      linkUI.color = Viva.Graph.View._webglUtil.parseColor(color);
+                      renderer.current.rerender();
+                    }
+                  }
+                }, 0);
+              }
+            }
+          });
+        }
+      };
     };
-
+  
+    connectWebSocket(); // Initial connection attempt
+  
     // Cleanup WebSocket on unmount
     return () => {
-          if (ws.current) {
-              ws.current.close();
-              ws.current = null;
-              console.log("WebSocket closed on unmount");
-          }
-     };
-//    return () => ws.current; // && ws.current.close();
-  }, [isInitialized, wsError]);
+      if (ws.current) {
+        ws.current.close();
+        ws.current = null;
+        console.log("WebSocket closed on unmount");
+      }
+    };
+    //    return () => ws.current; // && ws.current.close();
+  }, [isInitialized]);
    
 
   useEffect(() => {
