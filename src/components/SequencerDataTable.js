@@ -156,8 +156,7 @@ function SequencerDataTable() {
 
 
     const fetchLedgerIdentityData = async (baseUrl) => {
-        //const getLedgerIdUrl = `http://${baseUrl}/api/v1/get_ledger_id`;
-        const getLedgerIdUrl = `https://proximadlt.mooo.com/api/proxy/api/proxy/api/v1/get_ledger_id`;
+        const getLedgerIdUrl = `https://${baseUrl}/api/proxy/api/proxy/api/v1/get_ledger_id`;
             
         try {
             const ledgerIdResponse = await fetch(getLedgerIdUrl);
@@ -173,8 +172,7 @@ function SequencerDataTable() {
     };
     
     const fetchSyncInfo = async (baseUrl) => {
-        //const getSyncInfoUrl = `http://${baseUrl}/api/v1/sync_info`;
-        const getSyncInfoUrl = `https://proximadlt.mooo.com/api/proxy/api/proxy/api/v1/sync_info`;
+        const getSyncInfoUrl = `https://${baseUrl}/api/proxy/api/proxy/api/v1/sync_info`;
 
         try {
             const syncInfoResponse = await fetch(getSyncInfoUrl);
