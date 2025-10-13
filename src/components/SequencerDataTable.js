@@ -3,97 +3,7 @@ import ListView from './SequencersListView';
 import config from './../config';  // Import the configuration
 
 
-function extractOrConstraint(constraints) {
-    const orConstraint = constraints.find(item => item.startsWith("or("));
-    
-    if (orConstraint) {
-        // Extract the hex string (first value inside parentheses)
-        const match = orConstraint.match(/0x[0-9a-fA-F]+/);
-        
-        if (match) {
-            // Convert hex string to ASCII characters
-            const hexString = match[0].slice(2);
-            let asciiString = '';
-            for (let i = 0; i < hexString.length; i += 2) {
-                asciiString += String.fromCharCode(parseInt(hexString.substr(i, 2), 16));
-            }
-            return asciiString;
-        }
-    }
-    
-    return "";
-}
-
-function extractInflationValue(constraints) {
-    const inflationConstraint = constraints.find(item => item.startsWith("inflation("));
-
-    if (inflationConstraint) {
-        // Extract the number inside the parentheses after "u64/"
-        const match = inflationConstraint.match(/u64\/(\d+)/);
-        if (match) {
-            return match[1]; // Return the extracted number as a string
-        }
-    }
-    
-    return "";
-}
 /* eslint-env es2020 */
-function identityDataFromBytes(hexString) {
-    const buf = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16))); // Convert hex to Uint8Array
-    const view = new DataView(buf.buffer);
-    let offset = 0;
-
-    function readUint16() {
-        const value = view.getUint16(offset, false); // Big-endian
-        offset += 2;
-        return value;
-    }
-
-    function readUint32() {
-        const value = view.getUint32(offset, false); // Big-endian
-        offset += 4;
-        return value;
-    }
-
-    function readUint64() {
-        const high = view.getUint32(offset, false); // High 32 bits
-        const low = view.getUint32(offset + 4, false); // Low 32 bits
-        offset += 8;
-        return (BigInt(high) << 32n) | BigInt(low);
-    }
-
-    function readByte() {
-        return view.getUint8(offset++);
-    }
-
-    function readBytes(length) {
-        const slice = buf.slice(offset, offset + length);
-        offset += length;
-        return slice;
-    }
-
-    const descriptionSize = readUint16();
-    const description = new TextDecoder().decode(buf.slice(offset, offset + descriptionSize));
-    offset += descriptionSize;
-
-    return {
-        description,
-        genesisTimeUnix: readUint32(),
-        initialSupply: readUint64(),
-        genesisControllerPublicKey: readBytes(32), // ED25519 key (32 bytes)
-        tickDuration: readUint64(),
-        slotInflationBase: readUint64(),
-        linearInflationSlots: readUint64(),
-        branchInflationBonusBase: readUint64(),
-        vbCost: readUint64(),
-        transactionPace: readByte(),
-        transactionPaceSequencer: readByte(),
-        minimumAmountOnSequencer: readUint64(),
-        maxNumberOfEndorsements: readUint64(),
-        preBranchConsolidationTicks: readByte(),
-        postBranchConsolidationTicks: readByte(),
-    };
-}
 
 function hexToBytes(hex) {
     if (hex.length % 2 !== 0) throw new Error("Invalid hex string length");
@@ -131,7 +41,6 @@ function getSlotFromSequencerOutputID(outputIDHex) {
 
 function SequencerDataTable() {
     const [sequencerData, setSequencerData] = useState([]);
-    const [identityData, setIdentityData] = useState(null);
     const [syncInf, setSyncInfo] = useState(null);
 
 
@@ -149,28 +58,7 @@ function SequencerDataTable() {
     
         return () => clearInterval(intervalId);
     }, []);
-
-    useEffect(() => {
-        fetchLedgerIdentityData(config.baseUrl);
-    }, []);
-
-
-    const fetchLedgerIdentityData = async (baseUrl) => {
-        const getLedgerIdUrl = `https://${baseUrl}/api/proxy/api/proxy/api/v1/get_ledger_id`;
-            
-        try {
-            const ledgerIdResponse = await fetch(getLedgerIdUrl);
-            if (!ledgerIdResponse.ok) throw new Error("Failed to fetch ledger data");
-            
-            const ledgerIdData = await ledgerIdResponse.json();
-            const ledgerIdHex = ledgerIdData.ledger_id_bytes; // Assuming this is a hex string
-    
-            setIdentityData(identityDataFromBytes(ledgerIdHex));
-        } catch (error) {
-            console.error("Error fetching ledger identity data:", error.message);
-        }
-    };
-    
+   
     const fetchSyncInfo = async (baseUrl) => {
         const getSyncInfoUrl = `https://${baseUrl}/api/proxy/api/proxy/api/v1/sync_info`;
 

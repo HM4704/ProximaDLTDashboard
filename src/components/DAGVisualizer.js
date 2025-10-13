@@ -28,6 +28,7 @@ function getSlotForTxId(txid) {
   return slot >>> 0; // Ensure unsigned 32-bit integer
 }
 
+
 const DAGVisualizer = () => {
   const containerRef = useRef(null);
   const graph = useRef(Viva.Graph.graph());
@@ -39,6 +40,9 @@ const DAGVisualizer = () => {
   const [wsError, setWsError] = useState(false); // Store WebSocket errors
   const isPaused = useRef(false); // DAG display pause state
   const [hoveredNodeData, setHoveredNodeData] = useState(null);
+  const [selectedNodeData, setSelectedNodeData] = useState(null); // sticky info box
+  const hoveredNodeId = useRef(null);
+  const selectedNodeId = useRef(null);  
   const showEndorsementsRef = useRef(showEndorsements);
   const nodeTimestamps = useRef(new Map());
   const [txCount, setTxCount] = useState(0);
@@ -46,6 +50,35 @@ const DAGVisualizer = () => {
   const transactions = useRef([]);
   const [isConnected, setIsConnected] = useState(false);
   let latestSlot = useRef(0);
+
+  function highlightNode(nodeId, isSelected = false) {
+    const graphics = renderer.current.getGraphics();
+    const nodeUI = graphics.getNodeUI(nodeId);
+    if (nodeUI) {
+      nodeUI.size = isSelected ? 18 : 15; // bigger if selected
+      nodeUI.color = Viva.Graph.View._webglUtil.parseColor("#FFD700"); // gold/yellow highlight
+      renderer.current.rerender();
+    }
+  }
+
+  function unhighlightNode(nodeId) {
+    const graphics = renderer.current.getGraphics();
+    const nodeUI = graphics.getNodeUI(nodeId);
+    const node = graph.current.getNode(nodeId);
+    if (nodeUI && node?.data) {
+      // restore original color/size based on type
+      nodeUI.size =
+        node.data?.type === "branch" ? 12 :
+        node.data?.type === "sequencer" ? 11 :
+        10;
+      nodeUI.color = Viva.Graph.View._webglUtil.parseColor(
+        node.data?.type === "branch" ? BranchTxCol :
+        node.data?.type === "sequencer" ? SeqTxCol :
+        NormalTxCol
+      );
+      renderer.current.rerender();
+    }
+  }
 
   const zoomOutMultipleTimes = (times, delay) => {
     let count = 0;
@@ -122,13 +155,31 @@ const DAGVisualizer = () => {
     // Mouse events for showing node info
     const events = Viva.Graph.webglInputEvents(graphics, graph.current);
     events.mouseEnter((node) => {
-      setHoveredNodeData(node.data);
+      if (!selectedNodeId.current) {
+        setHoveredNodeData(node.data); // only show hover if no sticky
+        hoveredNodeId.current = node.id;
+        highlightNode(node.id);
+      }
     });
 
     events.mouseLeave(() => {
-      setHoveredNodeData(null);
+      if (!selectedNodeId.current) {
+        setHoveredNodeData(null);
+        unhighlightNode(hoveredNodeId.current);
+        hoveredNodeId.current = null;
+      }
     });
 
+    events.click((node) => {
+      setSelectedNodeData(node.data);
+      setHoveredNodeData(null); // disable hover when sticky is active
+      if (selectedNodeId.current) {
+        unhighlightNode(selectedNodeId.current); // remove highlight from previous selection
+      }
+      selectedNodeId.current = node.id;
+      highlightNode(node.id, true); // highlight as "selected"
+      console.log("node selected");
+    });
   }, [showEndorsements]);
 
   useEffect(() => {
@@ -406,13 +457,13 @@ const DAGVisualizer = () => {
       )}
      
       {/* Node Info Box */}
-      {hoveredNodeData && (
+      {(hoveredNodeData || selectedNodeData) && (
         <div
           style={{
             position: "absolute",
             top: "10px",
             right: "10px",
-            width: "460px",
+            width: "500px",
             backgroundColor: "white",
             padding: "10px",
             borderRadius: "5px",
@@ -420,22 +471,61 @@ const DAGVisualizer = () => {
             fontSize: "13px",
           }}
         >
-          <strong>ID:</strong> {hoveredNodeData.id}
+          {/* Close button (only if sticky) */}
+          {selectedNodeData && (
+            <button
+              onClick={() => {
+                setSelectedNodeData(null)
+                if (selectedNodeId.current) {
+                  unhighlightNode(selectedNodeId.current);
+                  selectedNodeId.current = null;
+                  console.log("node unselected");
+                }
+              }}
+              style={{
+                position: "absolute",
+                top: "5px",
+                right: "5px",
+                border: "none",
+                background: "transparent",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              ✖
+            </button>
+          )}
+
+          <strong>ID:</strong> {(selectedNodeData || hoveredNodeData).id}
           <br />
-          <strong>a:</strong> {hoveredNodeData.a}
+          <strong>a:</strong> {(selectedNodeData || hoveredNodeData).a}
           <br />
-          <strong>i:</strong> {hoveredNodeData.i}
+          <strong>i:</strong> {(selectedNodeData || hoveredNodeData).i}
           <br />
-          <strong>seqid:</strong> {hoveredNodeData.seqid}
+          <strong>seqid:</strong> {(selectedNodeData || hoveredNodeData).seqid}
           <br />
-          <strong>seqidx:</strong> {hoveredNodeData.seqidx}
+          <strong>seqidx:</strong> {(selectedNodeData || hoveredNodeData).seqidx}
           <br />
-          <strong>stemidx:</strong> {hoveredNodeData.stemidx}
+          <strong>stemidx:</strong> {(selectedNodeData || hoveredNodeData).stemidx}
           <br />
-          <strong>in:</strong> {hoveredNodeData.in?.join(", ")}
+          <strong>in:</strong> {(selectedNodeData || hoveredNodeData).in?.join(", ")}
           <br />
-          <strong>endorse:</strong> {hoveredNodeData.endorse?.join(", ")}
-        </div>
+          <strong>endorse:</strong> {(selectedNodeData || hoveredNodeData).endorse?.join(", ")}
+
+          {/* Open website button (only in sticky mode) */}
+          {/*selectedNodeData && (
+            <div style={{ marginTop: "10px" }}>
+              <button
+                onClick={() =>
+                  window.open(`https://www.proximate.live/explorer/${selectedNodeData.id}`, "_blank")
+                }
+              >
+                Open in Explorer
+              </button>
+            </div>
+          )*/}
+          </div>
+
       )}
 
       {/* Control Buttons */}
