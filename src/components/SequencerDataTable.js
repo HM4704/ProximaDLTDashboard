@@ -42,6 +42,7 @@ function getSlotFromSequencerOutputID(outputIDHex) {
 function SequencerDataTable() {
     const [sequencerData, setSequencerData] = useState([]);
     const [syncInf, setSyncInfo] = useState(null);
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
 
     useEffect(() => {
@@ -109,10 +110,49 @@ function SequencerDataTable() {
         }
     };
      
+    const sortedData = React.useMemo(() => {
+    if (!sortConfig.key) return sequencerData;
+
+    const sorted = [...sequencerData].sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+
+        // Handle numeric or string comparison
+        if (!isNaN(aVal) && !isNaN(bVal)) {
+        aVal = Number(aVal);
+        bVal = Number(bVal);
+        } else {
+        aVal = aVal?.toString().toLowerCase();
+        bVal = bVal?.toString().toLowerCase();
+        }
+
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    return sorted;
+    }, [sequencerData, sortConfig]);
+
+    const handleSort = (key) => {
+    setSortConfig((prev) => {
+        if (prev.key === key) {
+        // Toggle direction if same column
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+        }
+        // Otherwise set new sort column asc by default
+        return { key, direction: 'asc' };
+    });
+    };
+
     
     return (
         <div className="NodeDataTable">
-            <ListView data={sequencerData} />
+            <ListView
+            data={sortedData}
+            onSort={handleSort}
+            sortConfig={sortConfig}
+            />            
         </div>
     );
 }
