@@ -5,10 +5,53 @@ import config from './../config';  // Import the configuration
 
 /* eslint-env es2020 */
 
+
 function hexToBytes(hex) {
-    if (hex.length % 2 !== 0) throw new Error("Invalid hex string length");
-    return new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+  if (hex.startsWith("0x")) hex = hex.slice(2);
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes;
 }
+
+function getSequencerName(seqDataHex) {
+
+  // Parse Go "tuple" format (from tuples.TupleFromBytes)
+  function parseTuple(data) {
+    if (data.length < 2) throw new Error("Too short for tuple");
+    const prefix = (data[0] << 8) | data[1];
+    const numElements = prefix & 0x3FFF;
+    const lenType = (prefix >> 14) & 0x03;
+    const lenBytes = [0, 1, 2, 4][lenType];
+
+    const elements = [];
+    let offset = 2;
+    for (let i = 0; i < numElements; i++) {
+      let len = 0;
+      for (let j = 0; j < lenBytes; j++)
+        len = (len << 8) | data[offset + j];
+      offset += lenBytes;
+      elements.push(data.slice(offset, offset + len));
+      offset += len;
+    }
+    return elements;
+  }
+
+  // Parse tuple -> map of key→value
+  const bytes = hexToBytes(seqDataHex);
+  const elements = parseTuple(bytes);
+  
+  if (elements.length > 4) {
+	  const seqData = parseTuple(elements[4].slice(1));
+    if (seqData && seqData.length > 0) {
+        return new TextDecoder().decode(seqData[0].slice(1)).split('.')[0];
+    }
+  }
+
+  return null; // Name not found
+}
+
 
 function getSlotFromSequencerOutputID(outputIDHex) {
     const TimeByteLength = 8;
@@ -80,7 +123,7 @@ function SequencerDataTable() {
     };
 
     const fetchSequencerStats = async (baseUrl, syncInf) => {
-        const url = `https://${baseUrl}/api/proxy/api/proxy/api/v1/get_delegations_by_sequencer`;
+        const url = `https://${baseUrl}/api/proxy/api/proxy/api/v1/get_sequencers`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error("Failed to fetch sequencer data");
@@ -92,16 +135,16 @@ function SequencerDataTable() {
     
             const formattedData = Object.entries(sequencers).map(([sequencerId, details]) => ({
                 sequencerId,
-                seqOutputId: details.seq_output_id,
-                name: details.seq_name,
-                balance: BigInt(details.balance).toString(),
-                lastActive: (currentSlot - getSlotFromSequencerOutputID(details.seq_output_id)).toString(),
-                delegations: Object.entries(details.delegations).map(([delegatorId, delegation]) => ({
-                    delegatorId,
-                    amount: BigInt(delegation.amount),
-                    sinceSlot: delegation.since_slot,
-                    startAmount: BigInt(delegation.start_amount),
-                })),
+                seqOutputId: details.id,
+                name: getSequencerName(details.data),
+                // balance: BigInt(details.balance).toString(),
+                lastActive: (currentSlot - getSlotFromSequencerOutputID(details.id)).toString(),
+                // delegations: Object.entries(details.delegations).map(([delegatorId, delegation]) => ({
+                //     delegatorId,
+                //     amount: BigInt(delegation.amount),
+                //     sinceSlot: delegation.since_slot,
+                //     startAmount: BigInt(delegation.start_amount),
+                // })),
             }));
     
             setSequencerData(formattedData);
