@@ -41,11 +41,11 @@ function getSequencerName(seqDataHex) {
   // Parse tuple -> map of key→value
   const bytes = hexToBytes(seqDataHex);
   const elements = parseTuple(bytes);
-  
+
   if (elements.length > 4) {
-	  const seqData = parseTuple(elements[4].slice(1));
+    const seqData = parseTuple(elements[4].slice(1));
     if (seqData && seqData.length > 0) {
-        return new TextDecoder().decode(seqData[0].slice(1)).split('.')[0];
+      return new TextDecoder().decode(seqData[0].slice(1)).split('.')[0];
     }
   }
 
@@ -54,59 +54,81 @@ function getSequencerName(seqDataHex) {
 
 
 function getSlotFromSequencerOutputID(outputIDHex) {
-    const TimeByteLength = 8;
-    const TransactionIDShortLength = 27;
-    const TransactionIDLength = TimeByteLength + TransactionIDShortLength;
-    const ExpectedOutputIDLength = 32 + 1; // Should be 36 bytes
-    const SequencerTxFlagHigherByte = 0b10000000;
+  const TimeByteLength = 8;
+  const TransactionIDShortLength = 27;
+  const TransactionIDLength = TimeByteLength + TransactionIDShortLength;
+  const ExpectedOutputIDLength = 32 + 1;
+  const SequencerTxFlagHigherByte = 0b10000000;
 
     // Decode hex string to bytes
-    const bytes = hexToBytes(outputIDHex);
+  const bytes = hexToBytes(outputIDHex);
 
-    if (bytes.length !== ExpectedOutputIDLength) {
-        throw new Error(`Invalid OutputID length: expected ${ExpectedOutputIDLength}, got ${bytes.length}`);
-    }
+  if (bytes.length !== ExpectedOutputIDLength) {
+    throw new Error(`Invalid OutputID length: expected ${ExpectedOutputIDLength}, got ${bytes.length}`);
+  }
 
-    // Extract Transaction ID
-    const transactionID = bytes.slice(0, TransactionIDLength);
+  // Extract Transaction ID
+  const transactionID = bytes.slice(0, TransactionIDLength);
 
-    // Extract timestamp
-    const timestamp = transactionID.slice(0, TimeByteLength);
+  // Extract timestamp
+  const timestamp = transactionID.slice(0, TimeByteLength);
 
-    // Mask out the highest bit of the first byte
-    timestamp[0] &= ~SequencerTxFlagHigherByte;
+  // Mask out the highest bit of the first byte
+  timestamp[0] &= ~SequencerTxFlagHigherByte;
 
-    // Convert first 4 bytes to a slot (big-endian)
-    const slot = (timestamp[0] << 24) | (timestamp[1] << 16) | (timestamp[2] << 8) | timestamp[3];
+  // Convert first 4 bytes to a slot (big-endian)
+  const slot = (timestamp[0] << 24) | (timestamp[1] << 16) | (timestamp[2] << 8) | timestamp[3];
 
-    return slot;
+  return slot;
 }
 
+function formatAmount(amountStr) {
+  return amountStr.replace(/\B(?=(\d{3})+(?!\d))/g, "_");
+}
+
+/* Fetch parsed amounts */
+const fetchBalance = async (baseUrl, outputDataHex) => {
+  const url = `https://${baseUrl}/api/proxy/api/proxy/txapi/v1/parse_output_data?output_data=${outputDataHex}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Failed to parse balance");
+
+    const json = await response.json();
+    
+    if (json.amount) {
+      return formatAmount(BigInt(json.amount).toString());
+    }
+  } catch (err) {
+    console.error("Balance parsing failed:", err.message);
+  }
+  return "0";
+};
+
 function SequencerDataTable() {
-    const [sequencerData, setSequencerData] = useState([]);
-    const [syncInf, setSyncInfo] = useState(null);
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [sequencerData, setSequencerData] = useState([]);
+  const [syncInf, setSyncInfo] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
 
-    useEffect(() => {
+  useEffect(() => {
         // Fetch immediately when the component mounts
         fetchSyncInfo(config.baseUrl).then((latestSyncInf) => {
             fetchSequencerStats(config.baseUrl, latestSyncInf);
-        });
-        
-        const intervalId = setInterval(() => {
+    });
+
+    const intervalId = setInterval(() => {
             fetchSyncInfo(config.baseUrl).then((latestSyncInf) => {
                 fetchSequencerStats(config.baseUrl, latestSyncInf);
-            });
-        }, 5000);
-    
-        return () => clearInterval(intervalId);
-    }, []);
-   
-    const fetchSyncInfo = async (baseUrl) => {
+      });
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const fetchSyncInfo = async (baseUrl) => {
         const getSyncInfoUrl = `https://${baseUrl}/api/proxy/api/proxy/api/v1/sync_info`;
 
-        try {
+    try {
             const syncInfoResponse = await fetch(getSyncInfoUrl);
             if (!syncInfoResponse.ok) throw new Error('Failed to fetch sync info');
             const syncInfo = await syncInfoResponse.json();
@@ -119,85 +141,83 @@ function SequencerDataTable() {
             return updatedData; // Return the latest sync info
         } catch (error) {
             console.error('Error fetching ledger identity data:', error.message);
-        }
-    };
+    }
+  };
 
-    const fetchSequencerStats = async (baseUrl, syncInf) => {
-        const url = `https://${baseUrl}/api/proxy/api/proxy/api/v1/get_sequencers`;
-        try {
-            const response = await fetch(url);
+  const fetchSequencerStats = async (baseUrl, syncInf) => {
+    const url = `https://${baseUrl}/api/proxy/api/proxy/api/v1/get_sequencers`;
+    try {
+      const response = await fetch(url);
             if (!response.ok) throw new Error("Failed to fetch sequencer data");
+
+      const data = await response.json();
+      const sequencers = data.sequencers;
     
-            const data = await response.json();
-            const sequencers = data.sequencers;
-    
-            const currentSlot = syncInf?.currentSlot ?? 0; // Ensure syncInf is not null
-    
-            const formattedData = Object.entries(sequencers).map(([sequencerId, details]) => ({
-                sequencerId,
-                seqOutputId: details.id,
-                name: getSequencerName(details.data),
-                // balance: BigInt(details.balance).toString(),
-                lastActive: (currentSlot - getSlotFromSequencerOutputID(details.id)).toString(),
-                // delegations: Object.entries(details.delegations).map(([delegatorId, delegation]) => ({
-                //     delegatorId,
-                //     amount: BigInt(delegation.amount),
-                //     sinceSlot: delegation.since_slot,
-                //     startAmount: BigInt(delegation.start_amount),
-                // })),
-            }));
-    
-            setSequencerData(formattedData);
-        } catch (error) {
-            console.error("Error fetching sequencer stats:", error.message);
-        }
-    };
-     
+      const currentSlot = syncInf?.currentSlot ?? 0; // Ensure syncInf is not null
+
+      const formatted = await Promise.all(Object.entries(sequencers).map(async ([sequencerId, v]) => {
+        const balance = await fetchBalance(baseUrl, v.data);
+        return {
+          sequencerId,
+          seqOutputId: v.id,
+          name: getSequencerName(v.data),
+          balance,
+          lastActive: (currentSlot - getSlotFromSequencerOutputID(v.id)).toString(),
+        };
+      }));
+
+      setSequencerData(formatted);
+    } catch (err) {
+      console.error("Error fetching sequencer stats:", err);
+    }
+  };
+
+
     const sortedData = React.useMemo(() => {
-    if (!sortConfig.key) return sequencerData;
+        if (!sortConfig.key) return sequencerData;
+        const dir = sortConfig.direction === 'asc' ? 1 : -1;
 
-    const sorted = [...sequencerData].sort((a, b) => {
-        let aVal = a[sortConfig.key];
-        let bVal = b[sortConfig.key];
+        return [...sequencerData].sort((a, b) => {
+            if (sortConfig.key === 'balance') {
+                // Use BigInt compare (avoid Number overflow)
+                const ai = a.balanceRaw ?? BigInt((a.balance ?? "0").toString().replace(/_/g, ''));
+                const bi = b.balanceRaw ?? BigInt((b.balance ?? "0").toString().replace(/_/g, ''));
+                if (ai < bi) return -1 * dir;
+                if (ai > bi) return 1 * dir;
+                return 0;
+            }
 
-        // Handle numeric or string comparison
-        if (!isNaN(aVal) && !isNaN(bVal)) {
-        aVal = Number(aVal);
-        bVal = Number(bVal);
-        } else {
-        aVal = aVal?.toString().toLowerCase();
-        bVal = bVal?.toString().toLowerCase();
-        }
-
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
-
-    return sorted;
+            // fallback for other keys (strings / numbers)
+            let aa = a[sortConfig.key];
+            let bb = b[sortConfig.key];
+            if (!isNaN(aa) && !isNaN(bb)) {
+                aa = Number(aa); bb = Number(bb);
+            } else {
+                aa = aa?.toString().toLowerCase();
+                bb = bb?.toString().toLowerCase();
+            }
+            if (aa < bb) return -1 * dir;
+            if (aa > bb) return 1 * dir;
+            return 0;
+        });
     }, [sequencerData, sortConfig]);
 
-    const handleSort = (key) => {
-    setSortConfig((prev) => {
-        if (prev.key === key) {
-        // Toggle direction if same column
-        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
-        }
-        // Otherwise set new sort column asc by default
-        return { key, direction: 'asc' };
-    });
-    };
-
-    
-    return (
-        <div className="NodeDataTable">
-            <ListView
-            data={sortedData}
-            onSort={handleSort}
-            sortConfig={sortConfig}
-            />            
-        </div>
+  const handleSort = (key) => {
+    setSortConfig(prev =>
+      prev.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
     );
+  };
+
+
+  return (
+    <div className="NodeDataTable">
+      <ListView
+        data={sortedData}
+        onSort={handleSort}
+        sortConfig={sortConfig}
+      />
+    </div>
+  );
 }
 
 
